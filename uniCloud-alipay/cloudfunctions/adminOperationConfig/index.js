@@ -90,9 +90,9 @@ function isCouponObject(value) {
   return Number.isInteger(cost) && cost >= 0 && cost <= 1000000 && Number.isInteger(time) && time >= 0 && time <= 86400 && Number.isInteger(dailyLimit) && dailyLimit >= 0 && dailyLimit <= 1000
 }
 
-async function auditSafely(record) {
+async function auditSafely(record, dbLike = null) {
   try {
-    await addSecurityAuditLog(record)
+    await addSecurityAuditLog(record, dbLike)
   } catch (error) {
     console.error('[adminOperationConfig] audit failed', { action: record.action, message: error.message })
   }
@@ -151,7 +151,7 @@ exports.main = async (event = {}, context = {}) => {
     if (!configKey || !CONFIG_RULES[configKey](configValue)) return { code: ERROR_CODES.CONFIG_INVALID, message: '配置键或配置值无效' }
 
     const updatedAt = now()
-    await runTransaction(async (transaction) => {
+    const transactionResult = await runTransaction(async (transaction) => {
       const collection = transaction.collection('operation_config')
       const existing = await collection.where({ config_key: configKey }).limit(1).get()
       const previous = existing.data?.[0] || null
@@ -188,9 +188,10 @@ exports.main = async (event = {}, context = {}) => {
         meta: { config_hash: hash(JSON.stringify(configValue)) },
         created_at: updatedAt
       }, transaction)
+      return { configVersion }
     })
 
-          return { code: ERROR_CODES.SUCCESS, message: '配置已更新', data: { config_key: configKey, config_version: configVersion, updated_by: actor, updated_at: updatedAt } }
+    return { code: ERROR_CODES.SUCCESS, message: '配置已更新', data: { config_key: configKey, config_version: transactionResult.configVersion, updated_by: actor, updated_at: updatedAt } }
 
   } catch (error) {
     await auditSafely({

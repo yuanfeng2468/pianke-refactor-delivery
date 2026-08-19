@@ -8,6 +8,15 @@ function readJson(file) {
   return JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'))
 }
 
+const pkg = readJson('package.json')
+const manifest = readJson('manifest.json')
+if (pkg.version !== '3.1.1' || manifest.versionName !== '3.1.1' || Number(manifest.versionCode) !== 311) throw new Error('APK version metadata is not unified at 3.1.1/311')
+
+const adminConfig = fs.readFileSync(path.join(root, 'uniCloud-alipay/cloudfunctions/adminOperationConfig/index.js'), 'utf8')
+if (!adminConfig.includes('const transactionResult = await runTransaction')) throw new Error('admin config transaction result contract failed')
+if (!adminConfig.includes('config_version: transactionResult.configVersion')) throw new Error('admin config version scope contract failed')
+if (!adminConfig.includes('addSecurityAuditLog({') || !adminConfig.includes('}, transaction)')) throw new Error('admin security audit transaction contract failed')
+
 const schemaDir = path.join(root, 'uniCloud-alipay/database')
 const schemas = fs.readdirSync(schemaDir).filter((name) => name.endsWith('.schema.json'))
 for (const name of schemas) readJson(path.join('uniCloud-alipay/database', name))
@@ -30,4 +39,4 @@ if (/setTimeout\([^\n]*checkPrivacyPolicy/.test(app) || /checkPrivacyPolicy\(\)/
 const query = fs.readFileSync(path.join(root, 'uniCloud-alipay/cloudfunctions/queryRewardOrder/index.js'), 'utf8')
 if (!query.includes("query.status = 'created'") || !query.includes('10 * 60 * 1000') || !query.includes('created_at: order.created_at')) throw new Error('pending recovery contract failed')
 
-console.log(JSON.stringify({ schemas_checked: schemas.length, asset_whitelist: true, privacy_gate: true, pending_recovery: true }))
+console.log(JSON.stringify({ schemas_checked: schemas.length, asset_whitelist: true, privacy_gate: true, pending_recovery: true, apk_version: '3.1.1/311', admin_config_transaction: true }))

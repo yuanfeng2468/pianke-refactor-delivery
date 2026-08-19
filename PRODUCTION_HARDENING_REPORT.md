@@ -1,10 +1,12 @@
 # 片刻 PianKe APK 生产加固报告
 
+> **状态声明（APK V3 重构后）**：本报告记录早期生产加固阶段，最终状态以 `V3_APK_REFACTOR_FINAL_REPORT.md` 为准。本次任务按要求不执行 H5 构建。
+
 ## 结论
 
 本分支已依据《片刻 PianKe APK 架构重构与修复执行指令》完成一轮生产加固。重点覆盖奖励订单单调状态机、广告回调幂等与对账、Asia/Shanghai 业务日、用户每日统计、优惠券跨日限制、信息流会话幂等、运营配置审计、隐私启动门禁、AssetDTO 最小化和构建脚本。
 
-当前源码通过静态门禁和 App 目标构建，可进入云端灰度部署准备阶段；但 **H5 构建仍受当前 uni-app 依赖组合的上游兼容性问题阻断**，且未在真实 uniCloud、广告供应商回调和 Android 真机上完成联调，因此不应直接宣称已完成生产发布。
+当前源码通过静态门禁和 App 目标构建，可进入 APK 构建机和云端灰度部署准备阶段；本次 APK-only 重构未执行 H5，且未在真实 uniCloud、广告供应商回调和 Android 真机上完成联调，因此不应直接宣称已完成生产发布。
 
 ## 已实施的关键修复
 
@@ -28,14 +30,14 @@
 | 全部云函数 JavaScript 语法检查 | 通过 |
 | Phase 4 合约测试 | 通过：`schemas_checked=30`、AssetDTO 白名单、隐私门禁、待恢复订单检查均通过 |
 | App 目标构建 | 通过：`npm run build:app` 输出 `DONE Build complete` |
-| H5 构建 | 未通过：当前 uni-app 包与 Vue runtime 的导出版本不一致，出现 `isInSSRComponentSetup` / `normalizeCssVarValue` 导出错误 |
+| H5 构建 | 本次 APK-only 重构未执行 |
 | 真实云端事务、唯一索引、定时器、广告回调和 Android 真机 | 未执行，需部署环境验证 |
 
 ## 发布前门禁
 
 在 uniCloud 控制台建立新增集合并部署对应 schema/index 后，必须执行同一用户同一业务日的并发兑换、重复广告回调、跨日切换、待复核订单次日重放和事务失败回滚测试。对账函数必须配置至少 32 字符的高熵 `PIANKE_ADMIN_KEY` 或 `UNICLOUD_ADMIN_KEY`，不得将密钥提交到仓库。
 
-Android 发布前需要在 HBuilderX 中导入 `dist/build/app`，执行安装、隐私同意拒绝/同意、广告回调、后台恢复、网络失败和升级覆盖测试，并确认 `androidPrivacy.json` 在最终原生构建产物中生效。H5 目标应先锁定与 uni-app 3.0.0-5010520260709002 兼容的 Vue 工具链，再重新执行 `npm run build:h5`。
+Android 发布前需要在 HBuilderX 中导入 `dist/build/app`，执行安装、隐私同意拒绝/同意、广告回调、后台恢复、网络失败和升级覆盖测试，并确认 `androidPrivacy.json` 在最终原生构建产物中生效。H5 不属于本次任务范围；其构建状态不作为本次 APK 交付判定依据。
 
 ## 回滚策略
 
