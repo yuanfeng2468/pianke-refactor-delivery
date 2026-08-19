@@ -1,0 +1,10 @@
+{
+  "version": "1.0.0",
+  "triggers": [
+    {
+      "name": "reconcileRewardOrdersTimer",
+      "type": "timer",
+      "config": "0 15 */4 * * *"
+    }
+  ]
+}

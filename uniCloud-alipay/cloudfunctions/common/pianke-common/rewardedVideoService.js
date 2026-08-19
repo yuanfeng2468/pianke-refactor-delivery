@@ -1,11 +1,12 @@
 'use strict'
 
 const { ERROR_CODES, PiankeError, AD_EVENTS } = require('./constants')
-const { findUser, checkAndResetDaily, now, safeInt } = require('./utils')
+const { findUser, checkAndResetDaily, getTodayString, now, safeInt } = require('./utils')
 const { addLedger } = require('./walletService')
 const { addRelaxationLedger } = require('./relaxationService')
 const { grantInviteReward } = require('./invite')
 const { assertTransition } = require('./orderState')
+const { getDailyStat, incrementDailyStat } = require('./dailyStats')
 
 async function addAdLog(data, dbLike = null) {
   const db = dbLike || uniCloud.database()
@@ -69,11 +70,12 @@ async function processRewardedVideoCallback(params = {}) {
     const user = await findUser(transaction, uid)
     if (!user) throw new PiankeError('用户不存在', ERROR_CODES.USER_NOT_FOUND)
 
-    const configs = await getBatchConfigs(['daily_ad_limit', 'invite_reward_gold'], { daily_ad_limit: 15, invite_reward_gold: 200 })
-    const dailyLimit = Math.max(1, getOperationNumber(configs.daily_ad_limit, 15))
-    const inviteRewardGold = Math.max(0, getOperationNumber(configs.invite_reward_gold, 200))
+    const dailyLimit = Math.max(1, getOperationNumber(await require('./index').getRequiredOperationConfig('daily_ad_limit'), 1))
+    const inviteRewardGold = Math.max(0, getOperationNumber(await require('./index').getRequiredOperationConfig('invite_reward_gold'), 0))
     const reset = checkAndResetDaily(user, timestamp)
-    const currentCount = reset.changed ? 0 : safeInt(user.daily_ad_count)
+    const businessDate = getTodayString(timestamp)
+    const dailyStat = await getDailyStat({ db: transaction, uid, businessDate })
+    const currentCount = safeInt(dailyStat.data?.ad_count)
 
     if (currentCount >= dailyLimit) {
       if (order.status !== 'pending_review') assertTransition('reward_orders', order.status, 'pending_review')
@@ -93,6 +95,7 @@ async function processRewardedVideoCallback(params = {}) {
     const rewardTime = Math.max(0, safeInt(order.reward_time))
     const dailyCount = currentCount + 1
     const firstAd = safeInt(user.total_ad_views) === 0
+    await incrementDailyStat({ db: transaction, uid, businessDate, field: 'ad_count', delta: 1, timestamp })
     await transaction.collection('user').doc(uid).update({
       ...reset.patch, daily_ad_count: dailyCount, total_ad_views: uniCloud.database().command.inc(1), last_reward_at: timestamp, updated_at: timestamp
     })

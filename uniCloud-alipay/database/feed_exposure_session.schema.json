@@ -16,6 +16,9 @@
     "status": { "description": "issued/active/closed/rewarded/expired", "bsonType": "string", "enum": ["issued", "active", "closed", "rewarded", "expired"] },
     "started_at": { "description": "服务端曝光开始时间戳", "bsonType": "long" },
     "rewarded_at": { "description": "服务端奖励时间戳", "bsonType": "long" },
+    "end_time": { "description": "服务端关闭时间戳", "bsonType": "long" },
+    "reward_gold": { "description": "本次信息流奖励金币", "bsonType": "int", "minimum": 0 },
+    "reward_time": { "description": "本次信息流奖励放松时长", "bsonType": "int", "minimum": 0 },
     "result": { "description": "最近一次服务端结果快照", "bsonType": "object" },
     "created_at": { "description": "创建时间戳", "bsonType": "long" },
     "updated_at": { "description": "更新时间戳", "bsonType": "long" }

@@ -14,7 +14,12 @@ exports.main = async (event = {}, context = {}) => {
   const ip = clientIp(context)
   const configuredSecret = String(process.env.PIANKE_ADMIN_KEY || process.env.UNICLOUD_ADMIN_KEY || '').trim()
   const token = String(event.admin_token || '').trim()
-  if (!isStrongSecret(configuredSecret) || !safeAdminSecretCompare(configuredSecret, token)) {
+  const isEnabledTimer = String(process.env.PIANKE_RECONCILE_TIMER_ENABLED || '').toLowerCase() === 'true'
+  const isPlatformTimer = String(context.triggerType || context.trigger_type || '').toLowerCase() === 'timer'
+  const authorized = isEnabledTimer && isPlatformTimer
+    ? true
+    : isStrongSecret(configuredSecret) && safeAdminSecretCompare(configuredSecret, token)
+  if (!authorized) {
     return { code: ERROR_CODES.ADMIN_UNAUTHORIZED, message: '管理鉴权失败', data: { request_id } }
   }
 

@@ -1,10 +1,11 @@
 'use strict'
-const { 
-  requireAuth, assertRequestedUid, ERROR_CODES, PiankeError, 
-  getOperationConfig, getRequiredOperationConfig, getOperationNumber, findUser, 
-  checkAndResetDaily, runTransaction, stableId, getIdempotencyKey, 
+const {
+  requireAuth, assertRequestedUid, ERROR_CODES, PiankeError,
+  getOperationConfig, getRequiredOperationConfig, getOperationNumber, findUser,
+  checkAndResetDaily, getTodayString, runTransaction, stableId, getIdempotencyKey,
   safeInt, now, buildAssetPayload, addLedger, addRelaxationLedger, resolveScenePolicy, addRewardGrant
 } = require('pianke-common')
+const { getDailyStat, incrementDailyStat } = require('../common/pianke-common/dailyStats')
 
 exports.main = async (event = {}, context = {}) => {
   const requestedUid = String(event.uid || '').trim()
@@ -17,11 +18,11 @@ exports.main = async (event = {}, context = {}) => {
   if (!['start', 'claim', 'close'].includes(action) || !sessionId) {
     return { code: ERROR_CODES.INVALID_PARAMS, message: '参数错误' }
   }
-  
+
   try {
     const auth = await requireAuth(event, context)
     const uid = assertRequestedUid(requestedUid, auth.uid)
-    
+
     const feedRewardTime = await getRequiredOperationConfig('feed_exposure_reward_time')
     const scenePolicy = resolveScenePolicy(scene, { feed_exposure_reward_time: feedRewardTime })
     const minMs = Math.max(1000, getOperationNumber(await getOperationConfig('feed_exposure_min_ms', 60000), 60000))
@@ -79,8 +80,8 @@ exports.main = async (event = {}, context = {}) => {
       const exposureMs = timestamp - safeInt(session.started_at, timestamp)
       if (action === 'close' || (action === 'claim' && exposureMs < minMs)) {
         if (action === 'close') {
-          await transaction.collection('feed_exposure_session').doc(sessionKey).update({ 
-            status: 'closed', end_time: timestamp, updated_at: timestamp 
+          await transaction.collection('feed_exposure_session').doc(sessionKey).update({
+            status: 'closed', end_time: timestamp, updated_at: timestamp
           })
           responsePayload = { session_id: sessionId, status: 'closed', exposure_ms: exposureMs }
         } else {
@@ -91,18 +92,21 @@ exports.main = async (event = {}, context = {}) => {
 
       const user = await findUser(transaction, uid)
       const reset = checkAndResetDaily(user, timestamp)
-      
-      const feedLimit = getOperationNumber(await getOperationConfig('daily_feed_limit', 100), 100)
-      const currentFeedCount = (reset.changed ? 0 : safeInt(user.daily_feed_count))
+
+      const feedLimit = Math.max(1, getOperationNumber(await getRequiredOperationConfig('daily_feed_limit'), 1))
+      const businessDate = getTodayString(timestamp)
+      const dailyStat = await getDailyStat({ db: transaction, uid, businessDate })
+      const currentFeedCount = safeInt(dailyStat.data?.feed_count)
       if (currentFeedCount >= feedLimit) throw new PiankeError('今日曝光奖励已达上限', ERROR_CODES.DAILY_LIMIT_REACHED)
 
       const rewardGold = safeInt(scenePolicy.fixed_gold, 10)
       const rewardTime = safeInt(scenePolicy.fixed_time, 60)
 
       // 更新非资产字段；放松时长必须通过不可变账本变更。
+      await incrementDailyStat({ db: transaction, uid, businessDate, field: 'feed_count', delta: 1, timestamp })
       await transaction.collection('user').doc(uid).update({
         ...reset.patch,
-        daily_feed_count: db.command.inc(1),
+        daily_feed_count: currentFeedCount + 1,
         updated_at: timestamp
       })
 
@@ -129,21 +133,21 @@ exports.main = async (event = {}, context = {}) => {
         time_amount: rewardTime, created_at: timestamp
       })
 
-      await transaction.collection('feed_exposure_session').doc(sessionKey).update({ 
-        status: 'rewarded', 
-        rewarded_at: timestamp, 
+      await transaction.collection('feed_exposure_session').doc(sessionKey).update({
+        status: 'rewarded',
+        rewarded_at: timestamp,
         reward_gold: rewardGold,
         reward_time: rewardTime,
-        updated_at: timestamp 
+        updated_at: timestamp
       })
-      
+
       const updatedUser = await findUser(transaction, uid)
-      responsePayload = { 
-        session_id: sessionId, 
-        status: 'rewarded', 
-        reward_gold: rewardGold, 
+      responsePayload = {
+        session_id: sessionId,
+        status: 'rewarded',
+        reward_gold: rewardGold,
         reward_time: rewardTime,
-        ...buildAssetPayload(updatedUser, timestamp) 
+        ...buildAssetPayload(updatedUser, timestamp)
       }
     })
 

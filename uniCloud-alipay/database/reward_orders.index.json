@@ -14,9 +14,14 @@
     "MgoIsSparse": false
   },
   {
-    "IndexName": "idempotency_key_unique",
+    "IndexName": "uid_idempotency_key_unique",
     "MgoKeySchema": {
       "MgoIndexKeys": [
+        {
+          "Name": "uid",
+          "Direction": "1",
+          "Type": "varchar"
+        },
         {
           "Name": "idempotency_key",
           "Direction": "1",
