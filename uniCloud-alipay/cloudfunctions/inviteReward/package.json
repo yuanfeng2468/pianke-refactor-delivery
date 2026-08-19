@@ -1,0 +1,9 @@
+{
+  "name": "inviteReward",
+  "version": "1.0.0",
+  "description": "邀请码注册奖励（双方各+200金币）",
+  "main": "index.js",
+  "dependencies": {
+    "pianke-common": "file:../common/pianke-common"
+  }
+}

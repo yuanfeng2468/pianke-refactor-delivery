@@ -1,0 +1,13 @@
+[
+  {
+    "IndexName": "relax_sentences_active_created_at",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "is_active", "Direction": "1", "Type": "bool" },
+        { "Name": "created_at", "Direction": "-1", "Type": "long" }
+      ],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  }
+]

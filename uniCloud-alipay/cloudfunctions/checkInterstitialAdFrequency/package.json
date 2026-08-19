@@ -1,0 +1,9 @@
+{
+  "name": "checkInterstitialAdFrequency",
+  "version": "1.0.0",
+  "description": "检查插屏广告展示频次",
+  "main": "index.js",
+  "dependencies": {
+    "pianke-common": "file:../common/pianke-common"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "getUserInfo",
+  "version": "1.0.0",
+  "description": "获取用户信息（首次登录/初始化）",
+  "main": "index.js",
+  "dependencies": {
+    "pianke-common": "file:../common/pianke-common"
+  }
+}

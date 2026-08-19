@@ -1,0 +1,33 @@
+[
+  {
+    "IndexName": "ad_event_id_unique",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [{ "Name": "event_id", "Direction": "1", "Type": "varchar" }],
+      "MgoIsUnique": true
+    },
+    "MgoIsSparse": false
+  },
+  {
+    "IndexName": "ad_user_created_at",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "user_id", "Direction": "1", "Type": "varchar" },
+        { "Name": "created_at", "Direction": "-1", "Type": "long" }
+      ],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  },
+  {
+    "IndexName": "ad_scene_event_created_at",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "scene", "Direction": "1", "Type": "varchar" },
+        { "Name": "event_type", "Direction": "1", "Type": "varchar" },
+        { "Name": "created_at", "Direction": "-1", "Type": "long" }
+      ],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  }
+]

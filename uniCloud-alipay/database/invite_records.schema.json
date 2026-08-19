@@ -1,0 +1,59 @@
+{
+  "bsonType": "object",
+  "required": [
+    "_id",
+    "inviter_uid",
+    "invitee_uid",
+    "reward_gold",
+    "status",
+    "created_at"
+  ],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "description": "记录 ID",
+      "bsonType": "string"
+    },
+    "inviter_uid": {
+      "description": "邀请人",
+      "bsonType": "string"
+    },
+    "invitee_uid": {
+      "description": "被邀请人",
+      "bsonType": "string"
+    },
+    "reward_gold": {
+      "description": "奖励金币",
+      "bsonType": "int",
+      "minimum": 0
+    },
+    "status": {
+      "bsonType": "string",
+      "enum": [
+        "created",
+        "activated"
+      ]
+    },
+    "activated_at": {
+      "description": "激活时间",
+      "bsonType": "long"
+    },
+    "device_id": {
+      "description": "设备 ID",
+      "bsonType": "string"
+    },
+    "ip": {
+      "description": "IP",
+      "bsonType": "string"
+    },
+    "created_at": {
+      "description": "创建时间",
+      "bsonType": "long"
+    }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "bsonType": "object",
+  "required": ["_id", "type", "sender_id", "sender_name", "content", "created_at", "is_visible"],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "description": "消息ID",
+      "bsonType": "string"
+    },
+    "type": {
+      "description": "消息类型",
+      "bsonType": "string",
+      "enum": ["exchange_notification", "official_notice", "virtual_user_chat", "ad_card"]
+    },
+    "sender_id": {
+      "description": "发送者ID（system/user_xxx）",
+      "bsonType": "string"
+    },
+    "sender_name": {
+      "description": "发送者昵称",
+      "bsonType": "string"
+    },
+    "content": {
+      "description": "消息内容",
+      "bsonType": "string"
+    },
+    "exchange_record_id": {
+      "description": "关联的兑换记录ID（仅exchange类型）",
+      "bsonType": "string"
+    },
+    "ad_log_id": {
+      "description": "关联的广告日志ID（仅ad类型）",
+      "bsonType": "string"
+    },
+    "created_at": {
+      "description": "创建时间戳（毫秒）",
+      "bsonType": "long"
+    },
+    "is_visible": {
+      "description": "是否可见",
+      "bsonType": "bool"
+    }
+  }
+}

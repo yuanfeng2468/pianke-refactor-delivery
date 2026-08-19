@@ -1,0 +1,9 @@
+{
+  "name": "initUser",
+  "version": "1.0.0",
+  "description": "用户初始化（首次进入App时调用）",
+  "main": "index.js",
+  "dependencies": {
+    "pianke-common": "file:../common/pianke-common"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "bsonType": "object",
+  "required": ["_id", "trans_id", "invite_code", "inviter_id", "invitee_id", "reward_gold", "created_at"],
+  "permission": { "read": false, "create": false, "update": false, "delete": false },
+  "properties": {
+    "_id": { "description": "邀请奖励记录唯一 ID", "bsonType": "string" },
+    "trans_id": { "description": "邀请奖励事务键", "bsonType": "string" },
+    "invite_code": { "description": "邀请码", "bsonType": "string" },
+    "inviter_id": { "description": "邀请人 ID", "bsonType": "string" },
+    "invitee_id": { "description": "被邀请人 ID", "bsonType": "string" },
+    "reward_gold": { "description": "双方各获得的金币数", "bsonType": "int", "minimum": 0 },
+    "created_at": { "description": "服务端创建时间戳", "bsonType": "long" }
+  }
+}

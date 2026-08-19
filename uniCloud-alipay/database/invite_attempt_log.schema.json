@@ -1,0 +1,17 @@
+{
+  "bsonType": "object",
+  "required": ["_id", "user_id", "code_input", "result", "created_at"],
+  "permission": { "read": false, "create": false, "update": false, "delete": false },
+  "properties": {
+    "_id": { "description": "尝试记录唯一 ID", "bsonType": "string" },
+    "event_id": { "description": "关联激活/请求事件键", "bsonType": "string" },
+    "user_id": { "description": "用户 ID", "bsonType": "string" },
+    "code_input": { "description": "输入的邀请码", "bsonType": "string" },
+    "result": { "description": "校验结果", "bsonType": "string", "enum": ["success", "failed", "expired", "exceeded"] },
+    "message": { "description": "服务端结果摘要", "bsonType": "string" },
+    "ip_address": { "description": "请求 IP", "bsonType": "string" },
+    "device_id": { "description": "设备标识", "bsonType": "string" },
+    "user_agent": { "description": "User-Agent 摘要", "bsonType": "string" },
+    "created_at": { "description": "服务端创建时间戳", "bsonType": "long" }
+  }
+}

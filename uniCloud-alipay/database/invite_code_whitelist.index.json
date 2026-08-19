@@ -1,0 +1,17 @@
+[
+  {
+    "name": "invite_code_unique",
+    "key": {
+      "code": 1
+    },
+    "unique": true
+  },
+  {
+    "name": "invite_status_created_at",
+    "key": {
+      "status": 1,
+      "created_at": -1
+    },
+    "unique": false
+  }
+]

@@ -1,0 +1,35 @@
+[
+  {
+    "IndexName": "invitee_uid_unique",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "invitee_uid",
+          "Direction": "1",
+          "Type": "varchar"
+        }
+      ],
+      "MgoIsUnique": true
+    },
+    "MgoIsSparse": false
+  },
+  {
+    "IndexName": "inviter_uid_created_at",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "inviter_uid",
+          "Direction": "1",
+          "Type": "varchar"
+        },
+        {
+          "Name": "created_at",
+          "Direction": "-1",
+          "Type": "long"
+        }
+      ],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  }
+]

@@ -1,0 +1,37 @@
+{
+  "bsonType": "object",
+  "required": ["_id", "user_id", "last_show_at", "today_count", "today_date", "updated_at"],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "description": "记录ID",
+      "bsonType": "string"
+    },
+    "user_id": {
+      "description": "用户ID",
+      "bsonType": "string"
+    },
+    "last_show_at": {
+      "description": "最后展示时间戳（毫秒）",
+      "bsonType": "long"
+    },
+    "today_count": {
+      "description": "今日展示次数",
+      "bsonType": "int",
+      "minimum": 0
+    },
+    "today_date": {
+      "description": "日期标记（YYYY-MM-DD）",
+      "bsonType": "string"
+    },
+    "updated_at": {
+      "description": "更新时间戳（毫秒）",
+      "bsonType": "long"
+    }
+  }
+}

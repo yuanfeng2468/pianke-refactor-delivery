@@ -1,0 +1,40 @@
+/**
+ * 片刻 - 品牌视觉变量
+ * 
+ * 品牌色（Primary）: 宁静蓝 #4a8db7
+ * 强调色（Accent）: 琥珀暖 #d9b450
+ * 背景色: 深海黑 #0d0d1a
+ * 背景次色: 深蓝黑 #1a1a2e
+ * 卡片背景: 半透明白 rgba(255,255,255,0.06)
+ * 卡片强背景: rgba(255,255,255,0.09)
+ * 文字主色: rgba(255,255,255,0.85)
+ * 文字副色: rgba(255,255,255,0.5)
+ * 文字弱色: rgba(255,255,255,0.25)
+ */
+
+/* 品牌色 */
+$brand-primary: #4a8db7;
+$brand-primary-light: rgba(74, 141, 183, 0.2);
+$brand-accent: #d9b450;
+$brand-accent-light: rgba(217, 180, 80, 0.2);
+
+/* 背景色 */
+$bg-deep: #0d0d1a;
+$bg-card: rgba(255, 255, 255, 0.06);
+$bg-card-strong: rgba(255, 255, 255, 0.09);
+
+/* 文字色 */
+$text-primary: rgba(255, 255, 255, 0.85);
+$text-secondary: rgba(255, 255, 255, 0.5);
+$text-muted: rgba(255, 255, 255, 0.25);
+
+/* 边框色 */
+$border-light: rgba(255, 255, 255, 0.08);
+$border-medium: rgba(255, 255, 255, 0.12);
+
+/* 圆角 */
+$radius-sm: 8rpx;
+$radius-md: 16rpx;
+$radius-lg: 24rpx;
+$radius-xl: 32rpx;
+$radius-round: 999rpx;

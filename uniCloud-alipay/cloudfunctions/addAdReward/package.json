@@ -1,0 +1,9 @@
+{
+  "name": "addAdReward",
+  "version": "1.0.0",
+  "description": "激励视频广告观看完成后的奖励发放",
+  "main": "index.js",
+  "dependencies": {
+    "pianke-common": "file:../common/pianke-common"
+  }
+}

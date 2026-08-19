@@ -1,0 +1,24 @@
+[
+  {
+    "IndexName": "feedback_user_created_at",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "user_id", "Direction": "1", "Type": "varchar" },
+        { "Name": "created_at", "Direction": "-1", "Type": "long" }
+      ],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  },
+  {
+    "IndexName": "feedback_status_created_at",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "status", "Direction": "1", "Type": "varchar" },
+        { "Name": "created_at", "Direction": "-1", "Type": "long" }
+      ],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  }
+]

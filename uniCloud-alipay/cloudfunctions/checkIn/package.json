@@ -1,0 +1,9 @@
+{
+  "name": "checkIn",
+  "version": "1.0.0",
+  "description": "每日签到领取奖励",
+  "main": "index.js",
+  "dependencies": {
+    "pianke-common": "file:../common/pianke-common"
+  }
+}

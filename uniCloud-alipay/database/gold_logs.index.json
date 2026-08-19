@@ -1,0 +1,32 @@
+[
+  {
+    "IndexName": "gold_user_created_at",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "user_id", "Direction": "1", "Type": "varchar" },
+        { "Name": "created_at", "Direction": "-1", "Type": "long" }
+      ],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  },
+  {
+    "IndexName": "gold_trans_id_unique",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [{ "Name": "trans_id", "Direction": "1", "Type": "varchar" }],
+      "MgoIsUnique": true
+    },
+    "MgoIsSparse": false
+  },
+  {
+    "IndexName": "gold_source_created_at",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "source", "Direction": "1", "Type": "varchar" },
+        { "Name": "created_at", "Direction": "-1", "Type": "long" }
+      ],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  }
+]

@@ -1,0 +1,103 @@
+{
+  "pages": [
+    {
+      "path": "pages/relax/relax",
+      "style": {
+        "navigationStyle": "custom",
+        "app-plus": {
+          "titleNView": false
+        }
+      }
+    },
+    {
+      "path": "pages/coin/coin",
+      "style": {
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": true,
+        "app-plus": {
+          "titleNView": false
+        }
+      }
+    },
+    {
+      "path": "pages/my/my",
+      "style": {
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": true,
+        "app-plus": {
+          "titleNView": false
+        }
+      }
+    },
+    {
+      "path": "pages/activate/activate",
+      "style": {
+        "navigationStyle": "custom",
+        "app-plus": {
+          "titleNView": false
+        }
+      }
+    },
+    {
+      "path": "pages/exchangeRecords/exchangeRecords",
+      "style": {
+        "navigationStyle": "custom",
+        "app-plus": {
+          "titleNView": false
+        }
+      }
+    },
+    {
+      "path": "pages/legal/legal",
+      "style": {
+        "navigationStyle": "custom",
+        "app-plus": {
+          "titleNView": false
+        }
+      }
+    },
+    {
+      "path": "pages/feedback/feedback",
+      "style": {
+        "navigationStyle": "custom",
+        "app-plus": {
+          "titleNView": false
+        }
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "片刻",
+    "navigationBarBackgroundColor": "#1a1a2e",
+    "backgroundColor": "#0d0d1a",
+    "backgroundTextStyle": "light"
+  },
+  "tabBar": {
+    "color": "#666680",
+    "selectedColor": "#d9b450",
+    "borderStyle": "black",
+    "backgroundColor": "#1a1a2e",
+    "blurEffect": "extralight",
+    "list": [
+      {
+        "pagePath": "pages/relax/relax",
+        "text": "放松",
+        "iconPath": "static/tabbar/relax-off.png",
+        "selectedIconPath": "static/tabbar/relax-on.png"
+      },
+      {
+        "pagePath": "pages/coin/coin",
+        "text": "领金币",
+        "iconPath": "static/tabbar/coin-off.png",
+        "selectedIconPath": "static/tabbar/coin-on.png"
+      },
+      {
+        "pagePath": "pages/my/my",
+        "text": "我的",
+        "iconPath": "static/tabbar/my-off.png",
+        "selectedIconPath": "static/tabbar/my-on.png"
+      }
+    ]
+  }
+}

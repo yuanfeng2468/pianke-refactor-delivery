@@ -1,0 +1,32 @@
+[
+  {
+    "IndexName": "feed_session_id_unique",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [{ "Name": "session_id", "Direction": "1", "Type": "varchar" }],
+      "MgoIsUnique": true
+    },
+    "MgoIsSparse": false
+  },
+  {
+    "IndexName": "feed_user_created_at",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "user_id", "Direction": "1", "Type": "varchar" },
+        { "Name": "created_at", "Direction": "-1", "Type": "long" }
+      ],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  },
+  {
+    "IndexName": "feed_status_updated_at",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "status", "Direction": "1", "Type": "varchar" },
+        { "Name": "updated_at", "Direction": "-1", "Type": "long" }
+      ],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  }
+]

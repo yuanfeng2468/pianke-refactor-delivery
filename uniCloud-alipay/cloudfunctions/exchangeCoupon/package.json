@@ -1,0 +1,9 @@
+{
+  "name": "exchangeCoupon",
+  "version": "1.0.0",
+  "description": "金币兑换加时券",
+  "main": "index.js",
+  "dependencies": {
+    "pianke-common": "file:../common/pianke-common"
+  }
+}

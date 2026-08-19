@@ -1,0 +1,70 @@
+{
+  "bsonType": "object",
+  "required": [
+    "_id",
+    "uid",
+    "before_balance",
+    "delta",
+    "after_balance",
+    "business_type",
+    "idempotency_key",
+    "created_at"
+  ],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "description": "流水 ID",
+      "bsonType": "string"
+    },
+    "uid": {
+      "description": "用户 ID",
+      "bsonType": "string"
+    },
+    "before_balance": {
+      "description": "变更前余额",
+      "bsonType": "int",
+      "minimum": 0
+    },
+    "delta": {
+      "bsonType": "int"
+    },
+    "after_balance": {
+      "description": "变更后余额",
+      "bsonType": "int",
+      "minimum": 0
+    },
+    "business_type": {
+      "bsonType": "string",
+      "enum": [
+        "ad",
+        "ad_reward",
+        "feed_reward",
+        "invite",
+        "exchange",
+        "admin",
+        "checkin"
+      ]
+    },
+    "order_id": {
+      "description": "关联订单号",
+      "bsonType": "string"
+    },
+    "idempotency_key": {
+      "description": "幂等键",
+      "bsonType": "string"
+    },
+    "remark": {
+      "description": "备注",
+      "bsonType": "string"
+    },
+    "created_at": {
+      "description": "创建时间",
+      "bsonType": "long"
+    }
+  }
+}

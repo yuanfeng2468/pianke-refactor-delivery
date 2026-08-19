@@ -1,0 +1,162 @@
+[
+  {
+    "_id": "config_daily_ad_limit",
+    "config_key": "daily_ad_limit",
+    "config_value": { "value": 100 },
+    "description": "每日激励视频奖励上限",
+    "updated_by": "system_init",
+    "updated_at": 0
+  },
+  {
+    "_id": "config_daily_feed_limit",
+    "config_key": "daily_feed_limit",
+    "config_value": { "value": 100 },
+    "description": "每日信息流曝光奖励上限",
+    "updated_by": "system_init",
+    "updated_at": 0
+  },
+  {
+    "_id": "config_rewarded_video_reward",
+    "config_key": "rewarded_video_reward",
+    "config_value": { "gold": 100, "time": 300 },
+    "description": "激励视频奖励金币和放松秒数",
+    "updated_by": "system_init",
+    "updated_at": 0
+  },
+  {
+    "_id": "config_feed_exposure_min_ms",
+    "config_key": "feed_exposure_min_ms",
+    "config_value": { "value": 60000 },
+    "description": "信息流曝光达标毫秒数",
+    "updated_by": "system_init",
+    "updated_at": 0
+  },
+  {
+    "_id": "config_feed_exposure_reward_time",
+    "config_key": "feed_exposure_reward_time",
+    "config_value": { "value": 60 },
+    "description": "信息流曝光达标奖励放松秒数",
+    "updated_by": "system_init",
+    "updated_at": 0
+  },
+  {
+    "_id": "config_interstitial_frequency_minutes",
+    "config_key": "interstitial_frequency_minutes",
+    "config_value": { "value": 3 },
+    "description": "插屏最小展示间隔分钟",
+    "updated_by": "system_init",
+    "updated_at": 0
+  },
+  {
+    "_id": "config_interstitial_daily_limit",
+    "config_key": "interstitial_daily_limit",
+    "config_value": { "value": 5 },
+    "description": "插屏每日展示上限",
+    "updated_by": "system_init",
+    "updated_at": 0
+  },
+  {
+    "_id": "config_coupon_15min",
+    "config_key": "coupon_15min",
+    "config_value": { "cost": 300, "time": 900, "dailyLimit": 3 },
+    "description": "15分钟放松券运营配置",
+    "updated_by": "system_init",
+    "updated_at": 0
+  },
+  {
+    "_id": "config_coupon_60min",
+    "config_key": "coupon_60min",
+    "config_value": { "cost": 1000, "time": 3600, "dailyLimit": 1 },
+    "description": "60分钟放松券运营配置",
+    "updated_by": "system_init",
+    "updated_at": 0
+  },
+  {
+    "_id": "config_adpid_rewarded",
+    "config_key": "adpid_rewarded",
+    "config_value": { "value": "1790921229" },
+    "description": "激励视频广告位ID",
+    "updated_by": "system_init",
+    "updated_at": 0
+  },
+  {
+    "_id": "config_adpid_feed",
+    "config_key": "adpid_feed",
+    "config_value": { "value": "1971169255" },
+    "description": "信息流广告位ID",
+    "updated_by": "system_init",
+    "updated_at": 0
+  },
+  {
+    "_id": "config_adpid_interstitial",
+    "config_key": "adpid_interstitial",
+    "config_value": { "value": "1262278311" },
+    "description": "插屏广告位ID",
+    "updated_by": "system_init",
+    "updated_at": 0
+  },
+  {
+    "_id": "config_ad_enabled_rewarded",
+    "config_key": "ad_enabled_rewarded",
+    "config_value": { "value": true },
+    "description": "激励视频广告总开关",
+    "updated_by": "system_init",
+    "updated_at": 0
+  },
+  {
+    "_id": "config_ad_enabled_feed",
+    "config_key": "ad_enabled_feed",
+    "config_value": { "value": true },
+    "description": "信息流广告总开关",
+    "updated_by": "system_init",
+    "updated_at": 0
+  },
+  {
+    "_id": "config_ad_enabled_interstitial",
+    "config_key": "ad_enabled_interstitial",
+    "config_value": { "value": true },
+    "description": "插屏广告总开关",
+    "updated_by": "system_init",
+    "updated_at": 0
+  },
+  {
+    "_id": "config_invite_reward_gold",
+    "config_key": "invite_reward_gold",
+    "config_value": { "value": 200 },
+    "description": "成功邀请好友奖励金币数",
+    "updated_by": "system_init",
+    "updated_at": 0
+  },
+  {
+    "_id": "config_ad_reward_gold",
+    "config_key": "ad_reward_gold",
+    "config_value": { "value": 100 },
+    "description": "广告回调默认奖励金币",
+    "updated_by": "system_init",
+    "updated_at": 0
+  },
+  {
+    "_id": "config_ad_reward_time",
+    "config_key": "ad_reward_time",
+    "config_value": { "value": 300 },
+    "description": "广告回调默认奖励放松秒数",
+    "updated_by": "system_init",
+    "updated_at": 0
+  },
+  {
+    "_id": "config_legal_terms_url",
+    "config_key": "legal_terms_url",
+    "config_value": { "value": "https://env-00jy6ojekxqo-static.normal.cloudstatic.cn/user/service.html" },
+    "description": "服务协议云端前端托管地址",
+    "updated_by": "system_init",
+    "updated_at": 0
+  },
+  {
+    "_id": "config_legal_privacy_url",
+    "config_key": "legal_privacy_url",
+    "config_value": { "value": "https://env-00jy6ojekxqo-static.normal.cloudstatic.cn/user/privacy.html" },
+    "description": "隐私政策云端前端托管地址",
+    "updated_by": "system_init",
+    "updated_at": 0
+  }
+]

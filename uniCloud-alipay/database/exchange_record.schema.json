@@ -1,0 +1,39 @@
+{
+  "bsonType": "object",
+  "required": ["_id", "user_id", "exchange_type", "gold_consumed", "time_added", "created_at"],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "description": "记录ID",
+      "bsonType": "string"
+    },
+    "user_id": {
+      "description": "用户ID",
+      "bsonType": "string"
+    },
+    "exchange_type": {
+      "description": "兑换类型：15min/60min",
+      "bsonType": "string",
+      "enum": ["15min", "60min"]
+    },
+    "gold_consumed": {
+      "description": "消耗金币数",
+      "bsonType": "int",
+      "minimum": 0
+    },
+    "time_added": {
+      "description": "增加时间（秒）",
+      "bsonType": "int",
+      "minimum": 0
+    },
+    "created_at": {
+      "description": "兑换时间戳（毫秒）",
+      "bsonType": "long"
+    }
+  }
+}

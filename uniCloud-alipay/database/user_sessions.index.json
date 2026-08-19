@@ -1,0 +1,29 @@
+[
+  {
+    "IndexName": "user_sessions_token_hash_unique",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [{ "Name": "token_hash", "Direction": "1", "Type": "varchar" }],
+      "MgoIsUnique": true
+    },
+    "MgoIsSparse": false
+  },
+  {
+    "IndexName": "user_sessions_user_created_at",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "user_id", "Direction": "1", "Type": "varchar" },
+        { "Name": "created_at", "Direction": "-1", "Type": "long" }
+      ],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  },
+  {
+    "IndexName": "user_sessions_expires_at",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [{ "Name": "expires_at", "Direction": "1", "Type": "long" }],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  }
+]

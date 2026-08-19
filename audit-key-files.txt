@@ -1,0 +1,1785 @@
+===== uniCloud-alipay/cloudfunctions/getFeedAds/index.js =====
+'use strict'
+const { 
+  requireAuth, assertRequestedUid, ERROR_CODES, getBatchConfigs, 
+  getOperationString, getOperationNumber, stableId, now, AD_CONFIG, safeInt 
+} = require('pianke-common')
+
+function positiveInt(value, fallback, max) {
+  const parsed = Number.parseInt(value, 10)
+  if (!Number.isFinite(parsed) || parsed < 1) return fallback
+  return Math.min(parsed, max)
+}
+
+exports.main = async (event = {}, context = {}) => {
+  const requestedUid = String(event.uid || event.userId || '').trim()
+  const page = positiveInt(event.page, 1, 100000)
+  const pageSize = positiveInt(event.pageSize, 5, 20)
+  const db = uniCloud.database()
+  
+  try {
+    // 1. 并行鉴权与配置读取
+    const [auth, configs] = await Promise.all([
+      requireAuth(event, context),
+      getBatchConfigs(['ad_enabled_feed', 'adpid_feed'], {
+        ad_enabled_feed: true,
+        adpid_feed: AD_CONFIG.FEED_AD.ADPID
+      })
+    ])
+
+    const uid = assertRequestedUid(requestedUid, auth.uid)
+    const feedEnabled = configs.ad_enabled_feed !== false && configs.ad_enabled_feed !== 'false'
+    const configuredAdpid = getOperationString(configs.adpid_feed, AD_CONFIG.FEED_AD.ADPID).trim()
+    
+    if (!feedEnabled || !configuredAdpid) {
+      return { code: ERROR_CODES.SUCCESS, data: { ads: [], page, pageSize, hasMore: false } }
+    }
+
+    const timestamp = now()
+
+    // 2. 查询广告列表
+    const adResult = await db.collection('feed_ads')
+      .where({ is_active: true, adpid: configuredAdpid })
+      .orderBy('sort_order', 'asc')
+      .orderBy('created_at', 'desc')
+      .skip((page - 1) * pageSize)
+      .limit(pageSize)
+      .get()
+    
+    const rawAds = adResult.data || []
+    const ads = rawAds.filter(ad => ad && ad._id).map((ad, index) => {
+      const sessionId = stableId('feed_sess', `${uid}:${ad._id}:${timestamp}:${index}`)
+      const width = safeInt(ad.width, 0)
+      const height = safeInt(ad.height, 0)
+      const ratio = ad.aspect_ratio || (width > 0 && height > 0 ? width / height : 1.7778)
+      
+      return {
+        id: String(ad._id),
+        title: String(ad.title),
+        description: String(ad.description),
+        adpid: String(ad.adpid),
+        slotId: String(ad.slot_id || ''),
+        sessionId,
+        mediaType: String(ad.media_type || 'image'),
+        imageUrl: String(ad.image_url || ''),
+        videoUrl: String(ad.video_url || ''),
+        landingUrl: String(ad.landing_url || ''),
+        width, height, aspectRatio: ratio,
+        createdAt: safeInt(ad.created_at)
+      }
+    })
+
+    if (ads.length > 0) {
+      // 3. 并行异步预创建会话
+      const sessionCollection = db.collection('feed_exposure_session')
+      await Promise.all(ads.map(ad => {
+        const sessionKey = stableId('feed_session', ad.sessionId)
+        return sessionCollection.doc(sessionKey).set({
+          _id: sessionKey,
+          session_id: ad.sessionId,
+          ad_id: ad.id,
+          user_id: uid,
+          adpid: ad.adpid,
+          scene: 'coin_page_feed',
+          status: 'issued',
+          issued_at: timestamp,
+          created_at: timestamp,
+          updated_at: timestamp,
+          expires_at: timestamp + 30 * 60 * 1000
+        }).catch(() => {})
+      }))
+    }
+
+    return {
+      code: ERROR_CODES.SUCCESS,
+      message: 'success',
+      data: {
+        ads,
+        page,
+        pageSize,
+        hasMore: ads.length === pageSize
+      }
+    }
+  } catch (error) {
+    console.error('[getFeedAds] failed', error.message)
+    return { code: error.code || ERROR_CODES.SYSTEM_ERROR, message: '获取广告失败' }
+  }
+}
+===== uniCloud-alipay/cloudfunctions/claimFeedExposure/index.js =====
+'use strict'
+const { 
+  requireAuth, assertRequestedUid, ERROR_CODES, PiankeError, 
+  getOperationConfig, getOperationNumber, findUser, 
+  checkAndResetDaily, runTransaction, stableId, getIdempotencyKey, 
+  safeInt, now, buildAssetPayload, addLedger, addRelaxationLedger, getScenePolicy, addRewardGrant
+} = require('pianke-common')
+
+exports.main = async (event = {}, context = {}) => {
+  const requestedUid = String(event.uid || '').trim()
+  const action = String(event.action || 'start').trim()
+  const sessionId = getIdempotencyKey(event) || String(event.session_id || '').trim()
+  const adpid = String(event.adpid || '').trim()
+  const scene = String(event.scene || 'coin_page_feed').trim()
+  const db = uniCloud.database()
+
+  if (!['start', 'claim', 'close'].includes(action) || !sessionId) {
+    return { code: ERROR_CODES.INVALID_PARAMS, message: '参数错误' }
+  }
+  
+  try {
+    const auth = await requireAuth(event, context)
+    const uid = assertRequestedUid(requestedUid, auth.uid)
+    
+    const scenePolicy = getScenePolicy(scene) || { fixed_gold: 10, fixed_time: 60 }
+    const minMs = Math.max(1000, getOperationNumber(await getOperationConfig('feed_exposure_min_ms', 60000), 60000))
+    const timestamp = now()
+    const sessionKey = stableId('feed_session', sessionId)
+
+    let responsePayload = null
+
+    await runTransaction(async (transaction) => {
+      const sessionResult = await transaction.collection('feed_exposure_session').doc(sessionKey).get()
+      const session = sessionResult.data?.[0] || sessionResult.data
+
+      if (action === 'start') {
+        if (session && String(session.user_id) !== String(uid)) {
+          throw new PiankeError('会话无效', ERROR_CODES.RESOURCE_NOT_FOUND)
+        }
+        if (session && String(session.adpid || '') !== adpid && adpid) {
+          throw new PiankeError('广告位不匹配', ERROR_CODES.INVALID_PARAMS)
+        }
+        if (session && String(session.scene || '') !== scene) {
+          throw new PiankeError('广告场景不匹配', ERROR_CODES.INVALID_PARAMS)
+        }
+        if (!session) {
+          const newSession = { 
+            _id: sessionKey, user_id: uid, adpid, scene, status: 'active', 
+            started_at: timestamp, created_at: timestamp, updated_at: timestamp 
+          }
+          await transaction.collection('feed_exposure_session').doc(sessionKey).set(newSession)
+          responsePayload = { session_id: sessionId, status: 'active', started_at: timestamp }
+        } else {
+          responsePayload = { session_id: sessionId, status: session.status, started_at: session.started_at }
+        }
+        return
+      }
+
+      if (!session || String(session.user_id) !== String(uid)) throw new PiankeError('会话无效', ERROR_CODES.RESOURCE_NOT_FOUND)
+      if (String(session.adpid || '') !== adpid || String(session.scene || '') !== scene) {
+        throw new PiankeError('广告会话不匹配', ERROR_CODES.INVALID_PARAMS)
+      }
+      if (safeInt(session.expires_at, timestamp + 1) < timestamp) {
+        throw new PiankeError('广告会话已过期', ERROR_CODES.RESOURCE_NOT_FOUND)
+      }
+      if (!['issued', 'active'].includes(String(session.status))) {
+        if (['rewarded', 'closed'].includes(session.status)) {
+          responsePayload = { session_id: sessionId, status: session.status }
+          return
+        }
+        throw new PiankeError('广告会话状态无效', ERROR_CODES.INVALID_PARAMS)
+      }
+      const exposureMs = timestamp - safeInt(session.started_at)
+      if (action === 'close' || (action === 'claim' && exposureMs < minMs)) {
+        if (action === 'close') {
+          await transaction.collection('feed_exposure_session').doc(sessionKey).update({ 
+            status: 'closed', end_time: timestamp, updated_at: timestamp 
+          })
+          responsePayload = { session_id: sessionId, status: 'closed', exposure_ms: exposureMs }
+        } else {
+          throw new PiankeError('有效曝光时间不足', ERROR_CODES.INVALID_PARAMS)
+        }
+        return
+      }
+
+      const user = await findUser(transaction, uid)
+      const reset = checkAndResetDaily(user, timestamp)
+      
+      const feedLimit = getOperationNumber(await getOperationConfig('daily_feed_limit', 100), 100)
+      const currentFeedCount = (reset.changed ? 0 : safeInt(user.daily_feed_count))
+      if (currentFeedCount >= feedLimit) throw new PiankeError('今日曝光奖励已达上限', ERROR_CODES.DAILY_LIMIT_REACHED)
+
+      const rewardGold = safeInt(scenePolicy.fixed_gold, 10)
+      const rewardTime = safeInt(scenePolicy.fixed_time, 60)
+
+      // 更新非资产字段；放松时长必须通过不可变账本变更。
+      await transaction.collection('user').doc(uid).update({
+        ...reset.patch,
+        daily_feed_count: db.command.inc(1),
+        updated_at: timestamp
+      })
+
+      await addRelaxationLedger({
+        db: transaction,
+        uid,
+        deltaSeconds: rewardTime,
+        business_type: 'feed_reward',
+        order_id: sessionId,
+        idempotency_key: `feed_time:${sessionId}`,
+        remark: `信息流曝光放松时长:${adpid}`
+      })
+
+      // 统一通过 addLedger 处理金币变动与流水记录
+      await addLedger({
+        db: transaction, uid, delta: rewardGold, business_type: 'feed_reward',
+        order_id: sessionId, idempotency_key: `feed_ledger:${sessionId}`,
+        remark: `信息流曝光奖励:${adpid}`
+      })
+
+      await addRewardGrant({
+        db: transaction, trans_id: `feed_grant:${sessionId}`, order_id: sessionId,
+        user_id: uid, grant_type: 'feed_exposure', gold_amount: rewardGold,
+        time_amount: rewardTime, created_at: timestamp
+      })
+
+      await transaction.collection('feed_exposure_session').doc(sessionKey).update({ 
+        status: 'rewarded', 
+        rewarded_at: timestamp, 
+        reward_gold: rewardGold,
+        reward_time: rewardTime,
+        updated_at: timestamp 
+      })
+      
+      const updatedUser = await findUser(transaction, uid)
+      responsePayload = { 
+        session_id: sessionId, 
+        status: 'rewarded', 
+        reward_gold: rewardGold, 
+        reward_time: rewardTime,
+        ...buildAssetPayload(updatedUser, timestamp) 
+      }
+    })
+
+    return { code: ERROR_CODES.SUCCESS, data: responsePayload }
+  } catch (error) {
+    console.error('[claimFeedExposure] failed', error.message)
+    return { code: error.code || ERROR_CODES.SYSTEM_ERROR, message: error.message }
+  }
+}
+===== uniCloud-alipay/cloudfunctions/common/pianke-common/index.js =====
+'use strict'
+
+const crypto = require('crypto')
+const constants = require('./constants')
+const utils = require('./utils')
+const orderState = require('./orderState')
+const walletService = require('./walletService')
+const { addRelaxationLedger } = require('./relaxationService')
+const { processRewardedVideoCallback } = require('./rewardedVideoService')
+
+const {
+  RELEASE, ERROR_CODES, AD_CONFIG, INVITE_CONFIG, CHECKIN_CONFIG, COUPON_CONFIG,
+  AD_EVENT_TYPES, AD_SCENES, PiankeError
+} = constants
+
+const {
+  now, safeInt, stableId, hash, getTodayString, getYesterdayString, findUser
+} = utils
+
+const { addLedger } = walletService
+
+function safeAdminSecretCompare(expected, actual) {
+  const a = Buffer.from(String(expected || ''), 'utf8')
+  const b = Buffer.from(String(actual || ''), 'utf8')
+  return a.length === b.length && crypto.timingSafeEqual(a, b)
+}
+const { transitions, assertTransition, canTransition } = orderState
+const { SCENE_POLICIES, getScenePolicy, normalizeRewardContext, assertScene } = require('./adPolicy')
+
+function getIdempotencyKey(event = {}) { 
+  return String(event.idempotency_key || event.trans_id || event.request_id || '').trim() 
+}
+
+function assertRequestedUid(requested, uid) {
+  const rUid = typeof requested === 'object' ? requested.uid : requested
+  if (rUid && String(rUid).trim() !== String(uid).trim()) {
+    throw new PiankeError('用户身份不匹配', ERROR_CODES.AUTH_REQUIRED)
+  }
+  return String(uid).trim()
+}
+
+function requestId(event = {}, context = {}) {
+  return String(event.request_id || context.REQUEST_ID || context.requestId || stableId('req', `${Date.now()}:${Math.random()}`)).slice(0, 160)
+}
+
+function requestToken(event = {}, context = {}) {
+  return String(event.auth_token || event.token || context.AUTH_TOKEN || '').trim()
+}
+
+function clientDeviceId(event = {}, context = {}) {
+  return String(event.device_id || context.DEVICEID || context.deviceId || '').trim()
+}
+
+function clientIp(context = {}) {
+  return String(context.CLIENTIP || context.clientIP || context.CLIENT_IP || '').trim()
+}
+
+function createUserId(deviceId) {
+  return stableId('user', deviceId)
+}
+
+function defaultUserDocument(uid, deviceId, timestamp = now()) {
+  const today = getTodayString(timestamp)
+  return {
+    _id: uid,
+    device_id: deviceId,
+    gold_balance: 0,
+    relaxation_time: 0,
+    relaxation_started_at: 0,
+    relaxation_expire_at: 0,
+    daily_ad_count: 0,
+    daily_ad_date: today,
+    daily_feed_count: 0,
+    daily_feed_date: today,
+    invite_code: `PK${hash(uid).slice(0, 8).toUpperCase()}`,
+    invited_by: '',
+    invite_reward_claimed: false,
+    activation_status: 'pending',
+    continuous_checkin: 0,
+    last_checkin_date: '',
+    created_at: timestamp,
+    updated_at: timestamp
+  }
+}
+
+async function createUserInTransaction(transaction, deviceId) {
+  const uid = createUserId(deviceId)
+  const users = transaction.collection('user')
+  const existingDoc = await users.doc(uid).get()
+  if (existingDoc.data && existingDoc.data.length) return existingDoc.data[0]
+  if (existingDoc.data && !Array.isArray(existingDoc.data)) return existingDoc.data
+  const created = defaultUserDocument(uid, deviceId)
+  await users.doc(uid).set(created)
+  return created
+}
+
+async function createUserSession(uid, deviceId) {
+  const token = stableId('token', `${uid}:${deviceId}:${now()}:${Math.random()}`)
+  const timestamp = now()
+  const session = {
+    _id: stableId('session', token),
+    user_id: uid,
+    device_id: deviceId,
+    token_hash: hash(token),
+    expires_at: timestamp + 30 * 86400000,
+    revoked: false,
+    created_at: timestamp,
+    updated_at: timestamp
+  }
+  await uniCloud.database().collection('user_sessions').doc(session._id).set(session)
+  return { ...session, token }
+}
+
+async function requireAuth(event = {}, context = {}) {
+  const token = requestToken(event, context)
+  const uidHint = String(event.uid || context.USERID || '').trim()
+  if (!token) throw new PiankeError('未登录', ERROR_CODES.AUTH_REQUIRED)
+  
+  const result = await uniCloud.database().collection('user_sessions').where({ token_hash: hash(token), revoked: false }).limit(1).get()
+  const session = result.data?.[0]
+  if (!session || safeInt(session.expires_at) < now()) throw new PiankeError('登录已过期', ERROR_CODES.AUTH_REQUIRED)
+  if (uidHint && String(session.user_id) !== uidHint) throw new PiankeError('身份不匹配', ERROR_CODES.AUTH_REQUIRED)
+  
+  const user = await findUser(uniCloud.database(), session.user_id)
+  if (!user) throw new PiankeError('用户不存在', ERROR_CODES.USER_NOT_FOUND)
+  
+  return { uid: session.user_id, user, session }
+}
+
+function getClientInfo(event = {}, context = {}) {
+  // 网络身份只能来自云平台上下文；绝不信任客户端 event.ip。
+  return {
+    device_id: String(event.device_id || context.DEVICEID || context.deviceId || ''),
+    ip: String(context.CLIENTIP || context.clientIP || context.CLIENT_IP || ''),
+    ua: String(context.USERAGENT || context.userAgent || '')
+  }
+}
+
+async function runTransaction(callback, options = {}) {
+  const db = uniCloud.database()
+  const retries = Math.max(0, safeInt(options.retries, 2))
+  let lastError
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    const transaction = await db.startTransaction()
+    try { 
+      const result = await callback(transaction)
+      await transaction.commit()
+      return result 
+    } catch (error) { 
+      lastError = error
+      try { await transaction.rollback() } catch (_) {}
+      if (attempt >= retries) throw error 
+    }
+  }
+  throw lastError
+}
+
+const _configCache = new Map()
+const CONFIG_TTL_MS = 60000 // 60秒缓存过期
+
+async function getOperationConfig(key, fallback = null) {
+  const cached = _configCache.get(key)
+  const nowTime = Date.now()
+  if (cached && (nowTime - cached.timestamp < CONFIG_TTL_MS)) {
+    return cached.val
+  }
+  try { 
+    const result = await uniCloud.database().collection('operation_config').where({ config_key: key }).limit(1).get()
+    const val = result.data?.[0]?.config_value ?? fallback
+    _configCache.set(key, { val, timestamp: nowTime })
+    return val
+  } catch (_) { return fallback }
+}
+
+async function getBatchConfigs(keys, fallbacks = {}) {
+  const nowTime = Date.now()
+  const missing = keys.filter(k => {
+    const cached = _configCache.get(k)
+    return !cached || (nowTime - cached.timestamp >= CONFIG_TTL_MS)
+  })
+
+  if (missing.length > 0) {
+    try {
+      const db = uniCloud.database()
+      const result = await db.collection('operation_config').where({
+        config_key: db.command.in(missing)
+      }).limit(100).get()
+      
+      const found = {}
+      result.data.forEach(item => {
+        found[item.config_key] = item.config_value
+        _configCache.set(item.config_key, { val: item.config_value, timestamp: nowTime })
+      })
+      
+      missing.forEach(k => {
+        if (!(k in found)) {
+          const fb = fallbacks[k] ?? null
+          _configCache.set(k, { val: fb, timestamp: nowTime })
+        }
+      })
+    } catch (_) {
+      missing.forEach(k => {
+        if (!_configCache.has(k)) _configCache.set(k, { val: fallbacks[k] ?? null, timestamp: nowTime })
+      })
+    }
+  }
+
+  const res = {}
+  keys.forEach(k => {
+    const cached = _configCache.get(k)
+    res[k] = cached ? cached.val : (fallbacks[k] ?? null)
+  })
+  return res
+}
+
+function getOperationNumber(value, fallback = 0) { 
+  const val = (value && typeof value === 'object') ? (value.value ?? value.number ?? value.amount) : value
+  const n = Number(val)
+  return Number.isFinite(n) ? n : fallback 
+}
+
+function getOperationString(value, fallback = '') { 
+  const val = (value && typeof value === 'object') ? (value.value ?? value.string ?? value.text) : value
+  return val != null ? String(val) : fallback 
+}
+
+function checkAndResetDaily(user, timestamp = now()) {
+  const today = getTodayString(timestamp)
+  const patch = {}
+  let changed = false
+  if (user.daily_ad_date !== today) {
+    patch.daily_ad_date = today; patch.daily_ad_count = 0; changed = true
+  }
+  if (user.daily_feed_date !== today) {
+    patch.daily_feed_date = today; patch.daily_feed_count = 0; changed = true
+  }
+  return { changed, patch }
+}
+
+async function ensureUserInTransaction(transaction, uid) {
+  const user = await findUser(transaction, uid)
+  if (!user) throw new PiankeError('用户不存在', ERROR_CODES.USER_NOT_FOUND)
+  const { changed, patch } = checkAndResetDaily(user)
+  if (changed) {
+    await transaction.collection('user').doc(uid).update(patch)
+    return { ...user, ...patch }
+  }
+  return user
+}
+
+async function checkRateLimit(key, limit, windowSeconds) {
+  const normalizedKey = String(key || '').trim()
+  const maxCount = Math.max(1, safeInt(limit, 1))
+  const windowMs = Math.max(1, safeInt(windowSeconds, 1)) * 1000
+  if (!normalizedKey) throw new PiankeError('频率限制参数无效', ERROR_CODES.INVALID_PARAMS)
+
+  const recordId = stableId('ratelimit', normalizedKey)
+  const timestamp = now()
+
+  // 频率计数本身也必须具备事务隔离，否则并发请求可同时读到旧 count 并全部放行。
+===== uniCloud-alipay/cloudfunctions/common/pianke-common/transaction.js =====
+'use strict'
+
+const { findUser, stableId, now, safeInt } = require('./index')
+
+/**
+ * 查找幂等记录
+ */
+async function findIdempotentRecord(dbLike, collectionName, transId) {
+  if (!transId) return null
+  const id = stableId(collectionName, transId)
+  const result = await dbLike.collection(collectionName).doc(id).get()
+  return (result.data && result.data.length ? result.data[0] : result.data) || null
+}
+
+/**
+ * 查找奖励发放记录
+ */
+async function findRewardGrant(dbLike, transId) {
+  if (!transId) return null
+  // 统一使用 'grant' 作为前缀，与 writeLog 中的映射保持一致
+  const id = stableId('grant', transId)
+  const result = await dbLike.collection('reward_grants').doc(id).get()
+  return (result.data && result.data.length ? result.data[0] : result.data) || null
+}
+
+/**
+ * 构造统一的资产快照负载
+ * 解决 Read-After-Commit Latency：如果提供了最新的 user 对象，则直接使用它而不是重新从数据库读取
+ */
+function buildAssetPayload(user, timestamp = now()) {
+  if (!user) return { server_timestamp: timestamp }
+  return {
+    user: {
+      ...user,
+      gold_balance: safeInt(user.gold_balance),
+      relaxation_time: safeInt(user.relaxation_time),
+      total_ad_views: safeInt(user.total_ad_views),
+      daily_ad_count: safeInt(user.daily_ad_count),
+      coupon_15min_today: safeInt(user.coupon_15min_today),
+      coupon_60min_today: safeInt(user.coupon_60min_today)
+    },
+    gold_balance: safeInt(user.gold_balance),
+    relaxation_time: safeInt(user.relaxation_time),
+    total_ad_views: safeInt(user.total_ad_views),
+    daily_ad_count: safeInt(user.daily_ad_count),
+    server_timestamp: timestamp
+  }
+}
+
+/**
+ * 获取最新的资产快照负载 (兼容旧逻辑，但优先推荐在事务中直接返回)
+ */
+async function latestAssetPayload(uid, timestamp = now(), dbLike = null) {
+  const db = dbLike || uniCloud.database()
+  const user = await findUser(db, uid)
+  return buildAssetPayload(user, timestamp)
+}
+
+module.exports = {
+  findIdempotentRecord,
+  findRewardGrant,
+  buildAssetPayload,
+  latestAssetPayload
+}
+===== uniCloud-alipay/cloudfunctions/common/pianke-common/rewardedVideoService.js =====
+'use strict'
+
+const { ERROR_CODES, PiankeError } = require('./constants')
+const { findUser, checkAndResetDaily, now, safeInt } = require('./utils')
+const { addLedger } = require('./walletService')
+const { addRelaxationLedger } = require('./relaxationService')
+
+async function addAdLog(data, dbLike = null) {
+  const db = dbLike || uniCloud.database()
+  const id = data._id || `adlog_${String(data.trans_id || Date.now())}`
+  await db.collection('ad_log').doc(id).set({ _id: id, ...data, created_at: data.created_at || now() })
+}
+async function addRewardGrant(data, dbLike = null) {
+  const db = dbLike || uniCloud.database()
+  const payload = { ...data }
+  delete payload.db
+  const id = payload._id || `grant_${String(payload.trans_id || Date.now())}`
+  await db.collection('reward_grants').doc(id).set({ _id: id, ...payload, created_at: payload.created_at || now() })
+}
+async function addSecurityAuditLog(data) {
+  try {
+    const db = uniCloud.database()
+    const id = data._id || `audit_${String(data.event_id || Date.now())}`
+    await db.collection('security_audit_logs').doc(id).set({
+      _id: id, ...data, created_at: data.created_at || now()
+    })
+  } catch (_) {}
+}
+
+/**
+ * 统一激励视频奖励发放内核。
+ *
+ * 重要：该模块只接受 uniAdCallback 经过安全链路转发后的回调。
+ * 客户端 onClose / reportAdCompleted 永远不能调用本模块发奖。
+ */
+async function processRewardedVideoCallback(params = {}) {
+  const adpid = String(params.adpid || '').trim()
+  const transId = String(params.trans_id || '').trim()
+  const uid = String(params.user_id || params.userId || '').trim()
+
+  let extra = params.extra
+  for (let i = 0; i < 3 && typeof extra === 'string'; i += 1) {
+    try { extra = JSON.parse(extra) } catch (_) { break }
+  }
+  extra = extra && typeof extra === 'object' && !Array.isArray(extra) ? extra : {}
+
+  const orderId = String(extra.order_id || params.order_id || '').trim()
+  const scene = String(extra.scene || params.scene || '').trim()
+  const timestamp = now()
+  const { getBatchConfigs, getOperationNumber, runTransaction } = require('./index')
+
+  if (!adpid || !transId || !uid || !orderId || !scene) {
+    throw new PiankeError('广告回调参数不完整', ERROR_CODES.INVALID_PARAMS)
+  }
+
+  let result = null
+
+  await runTransaction(async (transaction) => {
+    // 第一层幂等：trans_id。
+    const grantExists = await transaction.collection('reward_grants')
+      .where({ trans_id: transId }).limit(1).get()
+
+    if (grantExists.data?.length) {
+      result = { status: 'already_processed', trans_id: transId }
+      return
+    }
+
+    const orderResult = await transaction.collection('reward_orders')
+      .where({ order_id: orderId, uid }).limit(1).get()
+    const order = orderResult.data?.[0]
+
+    if (!order) throw new PiankeError('广告订单不存在', ERROR_CODES.ORDER_NOT_FOUND)
+    if (order.status === 'rewarded') {
+      result = { status: 'already_rewarded', trans_id: transId, order_id: orderId }
+      return
+    }
+    if (order.status === 'failed') {
+      throw new PiankeError('广告订单已取消', ERROR_CODES.INVALID_PARAM)
+    }
+    if (String(order.adpid) !== adpid || String(order.scene) !== scene) {
+      throw new PiankeError('广告回调与订单不匹配', ERROR_CODES.INVALID_PARAM)
+    }
+
+    const user = await findUser(transaction, uid)
+    if (!user) throw new PiankeError('用户不存在', ERROR_CODES.USER_NOT_FOUND)
+
+    const configs = await getBatchConfigs(
+      ['daily_ad_limit', 'invite_reward_gold'],
+      { daily_ad_limit: 15, invite_reward_gold: 200 }
+    )
+    const dailyLimit = Math.max(1, getOperationNumber(configs.daily_ad_limit, 15))
+    const inviteRewardGold = Math.max(0, getOperationNumber(configs.invite_reward_gold, 200))
+
+    const reset = checkAndResetDaily(user, timestamp)
+    const currentCount = reset.changed ? 0 : safeInt(user.daily_ad_count)
+    if (currentCount >= dailyLimit) {
+      throw new PiankeError('今日广告次数已达上限', ERROR_CODES.DAILY_LIMIT_REACHED)
+    }
+
+    const rewardGold = Math.max(0, safeInt(order.reward_gold))
+    const rewardTime = Math.max(0, safeInt(order.reward_time))
+    const dailyCount = currentCount + 1
+    const firstAd = safeInt(user.total_ad_views) === 0
+
+    // 先更新订单/用户状态，随后由两个账本原子记录资产变化。
+    await transaction.collection('user').doc(uid).update({
+      ...reset.patch,
+      daily_ad_count: dailyCount,
+      total_ad_views: uniCloud.database().command.inc(1),
+      last_reward_at: timestamp,
+      updated_at: timestamp
+    })
+
+    await addLedger({
+      db: transaction,
+      uid,
+      delta: rewardGold,
+      business_type: 'ad_reward',
+      order_id: orderId,
+      idempotency_key: transId,
+      remark: `激励视频奖励:${scene}`
+    })
+
+    if (rewardTime > 0) {
+      await addRelaxationLedger({
+        db: transaction,
+        uid,
+        deltaSeconds: rewardTime,
+        business_type: 'ad_reward',
+        order_id: orderId,
+        idempotency_key: `ad_time:${transId}`,
+        remark: `激励视频放松时长:${scene}`
+      })
+    }
+
+    await addRewardGrant({
+      db: transaction,
+      trans_id: transId,
+      order_id: orderId,
+      user_id: uid,
+      grant_type: 'ad_video',
+      adpid,
+      scene,
+      reward_type: order.reward_type || 'gold_and_time',
+      reward_context: order.reward_context || {},
+      gold_amount: rewardGold,
+      time_amount: rewardTime,
+      created_at: timestamp
+    })
+
+    await transaction.collection('reward_orders').doc(order._id).update({
+      status: 'rewarded',
+      trans_id: transId,
+      callback_time: timestamp,
+      rewarded_at: timestamp,
+      updated_at: timestamp
+    })
+
+    // 首次有效广告的邀请奖励也使用同一事务。
+    if (firstAd && user.invited_by && !user.invite_reward_claimed && inviteRewardGold > 0) {
+      const inviterRes = await transaction.collection('user')
+        .where({ invite_code: String(user.invited_by).trim().toUpperCase() })
+        .limit(1).get()
+      const inviter = inviterRes.data?.[0]
+
+      if (inviter && inviter._id !== uid) {
+        const base = `auto_invite:${uid}`
+
+        await addLedger({
+          db: transaction, uid: inviter._id, delta: inviteRewardGold,
+          business_type: 'invite', order_id: `${base}:inviter`,
+          idempotency_key: `${base}:inviter`, remark: '邀请好友首看奖励'
+        })
+        await addRewardGrant({
+          db: transaction, trans_id: `${base}:inviter`, order_id: `${base}:inviter`,
+          user_id: inviter._id, grant_type: 'invite_reward_inviter',
+          gold_amount: inviteRewardGold, time_amount: 0, created_at: timestamp
+        })
+
+        await addLedger({
+          db: transaction, uid, delta: inviteRewardGold,
+          business_type: 'invite', order_id: `${base}:invitee`,
+          idempotency_key: `${base}:invitee`, remark: '完成首次有效行为奖励'
+        })
+        await addRewardGrant({
+          db: transaction, trans_id: `${base}:invitee`, order_id: `${base}:invitee`,
+          user_id: uid, grant_type: 'invite_reward_invitee',
+          gold_amount: inviteRewardGold, time_amount: 0, created_at: timestamp
+        })
+
+        await transaction.collection('user').doc(uid).update({
+          invite_reward_claimed: true, updated_at: timestamp
+        })
+      }
+    }
+
+    result = {
+      status: 'rewarded',
+      trans_id: transId,
+      order_id: orderId,
+      gold: rewardGold,
+      time: rewardTime,
+      daily_count: dailyCount
+    }
+  }, { retries: 2 })
+
+  await addAdLog({
+    event_id: `callback:${transId}`,
+    user_id: uid,
+    adpid,
+    scene,
+    event_type: result.status === 'rewarded' ? 'reward_success' : 'reward_duplicate',
+    status: 'success',
+    trans_id: transId,
+    reward_amount: result.gold || 0,
+    reward_time: result.time || 0,
+    created_at: timestamp
+  })
+
+  return result
+}
+
+module.exports = { processRewardedVideoCallback }
+===== uniCloud-alipay/cloudfunctions/checkInterstitialFreq/index.js =====
+===== uniCloud-alipay/cloudfunctions/cleanupFeedSessions/index.js =====
+'use strict'
+const { ERROR_CODES, now, writeLog } = require('pianke-common')
+
+exports.main = async (event = {}, context = {}) => {
+  try {
+    const db = uniCloud.database()
+    const timestamp = now()
+    let totalUpdated = 0
+    let hasMore = true
+    let batchCount = 0
+    const maxBatches = 10 // 最多循环10次（单次100条，单次执行最多清理1000条，防止超时）
+
+    while (hasMore && batchCount < maxBatches) {
+      batchCount++
+      const expiredResult = await db.collection('feed_exposure_session')
+        .where({
+          status: db.command.in(['issued', 'active']),
+          expires_at: db.command.lt(timestamp)
+        })
+        .limit(100)
+        .get()
+
+      const sessions = expiredResult.data || []
+      if (sessions.length === 0) {
+        hasMore = false
+        break
+      }
+
+      for (const session of sessions) {
+        const updateRes = await db.collection('feed_exposure_session').where({
+          _id: session._id,
+          status: db.command.in(['issued', 'active'])
+        }).update({
+          status: 'expired',
+          result: { session_id: session.session_id || session._id, status: 'expired', reason: 'timeout_expired' },
+          updated_at: timestamp
+        })
+        if (updateRes && (updateRes.updated > 0 || updateRes.updated === undefined)) {
+          await writeLog('ad_log', {
+            event_id: `feed_expired:${session.session_id || session._id}_${timestamp}`,
+            user_id: session.user_id,
+            adpid: session.adpid,
+            scene: session.scene || 'coin_page_feed',
+            event_type: 'exposure_expired',
+            trans_id: session.session_id || session._id
+          })
+          totalUpdated += 1
+        }
+      }
+
+      if (sessions.length < 100) {
+        hasMore = false
+      }
+    }
+
+    return { code: ERROR_CODES.SUCCESS, message: '清理完成', data: { updated_count: totalUpdated, batches: batchCount } }
+  } catch (error) {
+    console.error('[cleanupFeedSessions] failed', error)
+    return { code: ERROR_CODES.SYSTEM_ERROR, message: error.message || '清理失败' }
+  }
+}
+===== pages/coin/coin.vue =====
+<template>
+  <view class="coin-page">
+    <view class="background-gradient" />
+    <view class="ambient-glow" />
+
+    <view class="top-asset-card">
+      <view class="asset-row">
+        <view class="asset-item" @click="syncAssets">
+          <text class="asset-label">金币余额</text>
+          <text class="asset-value gold">{{ user.gold_balance || 0 }}</text>
+        </view>
+        <view class="asset-divider" />
+        <view class="asset-item" @click="syncAssets">
+          <text class="asset-label">放松时间</text>
+          <text class="asset-value">{{ userStore.formattedRelaxTime }}</text>
+        </view>
+        <view class="asset-divider" />
+        <view class="asset-item" @click="syncAssets">
+          <text class="asset-label">今日进度</text>
+          <text class="asset-value">{{ user.daily_ad_count || 0 }}/{{ userStore.dailyAdLimit }}</text>
+        </view>
+      </view>
+      <view class="progress-track"><view class="progress-fill" :style="{ width: `${userStore.adProgress}%` }" /></view>
+      <view class="quick-earn-btn" :class="{ disabled: rewardLoading || !isAdEnabled(userStore, 'rewarded') }" @click="handleQuickEarn">
+        <text class="quick-earn-text">
+          <template v-if="!isAdEnabled(userStore, 'rewarded')">功能维护中</template>
+          <template v-else-if="rewardLoading">广告准备中...</template>
+          <template v-else>快速赚金币 · 完整观看获取金币与放松时间奖励</template>
+        </text>
+      </view>
+    </view>
+
+    <!-- 每日签到 -->
+    <view class="checkin-card glass animate-fade-in">
+      <view class="checkin-header">
+        <view class="checkin-info">
+          <text class="checkin-title">每日签到</text>
+          <text class="checkin-desc">已连续签到 {{ userStore.user.continuous_checkin || 0 }} 天</text>
+        </view>
+        <button 
+          class="checkin-btn" 
+          :class="{ 'btn-disabled': userStore.isTodayCheckedIn || checkInLoading }"
+          :disabled="userStore.isTodayCheckedIn || checkInLoading"
+          @tap="handleCheckIn"
+        >
+          {{ userStore.isTodayCheckedIn ? '今日已领' : (checkInLoading ? '签到中...' : '立即签到') }}
+        </button>
+      </view>
+      <view class="checkin-days">
+        <view 
+          v-for="day in 7" 
+          :key="day" 
+          class="day-item"
+          :class="{ 'day-active': day <= (userStore.user.continuous_checkin || 0), 'day-today': day === ((userStore.user.continuous_checkin || 0) % 7) + 1 && !userStore.isTodayCheckedIn }"
+        >
+          <text class="day-gold">+{{ [10, 20, 30, 50, 80, 100, 200][day-1] }}</text>
+          <view class="day-dot" />
+          <text class="day-label">{{ day }}天</text>
+        </view>
+      </view>
+    </view>
+
+    <scroll-view
+      scroll-y
+      class="feed-scroll-container"
+      :refresher-enabled="true"
+      :refresher-triggered="isRefreshing"
+      @refresherrefresh="onPullRefresh"
+      @scrolltolower="loadMoreFeed"
+    >
+      <view class="feed-list">
+        <view v-for="item in feedItems" :key="item.id" class="feed-card" @click="handleAdClick(item)">
+          <view v-if="!item.mediaFailed && item.mediaType === 'image' && item.imageUrl" class="ad-media-frame" :style="mediaStyle(item)">
+            <image class="ad-image" :src="item.imageUrl" mode="aspectFill" @error="onMediaError(item, $event)" />
+          </view>
+          <view v-else-if="!item.mediaFailed && item.mediaType === 'video' && item.videoUrl" class="ad-media-frame" :style="mediaStyle(item)">
+            <video class="ad-video" :src="item.videoUrl" :show-center-play-btn="true" :controls="true" @error="onMediaError(item, $event)" />
+          </view>
+          <!-- #ifdef APP-PLUS || MP-WEIXIN -->
+          <ad
+            v-else-if="!item.mediaFailed && item.mediaType === 'native'"
+            :adpid="item.adpid"
+            class="native-ad"
+            @load="onAdLoad(item)"
+            @error="onAdError(item, $event)"
+            @close="onAdClose(item)"
+          />
+          <!-- #endif -->
+          <view class="ad-copy">
+            <view class="card-header">
+              <text class="card-title">{{ item.title }}</text>
+              <text class="ad-tag">广告内容</text>
+            </view>
+            <text class="card-desc">{{ item.description }}</text>
+          </view>
+          <view class="card-footer">
+            <text class="ad-reward-tip">{{ item.rewarded ? '已获得 +1 分钟放松时长' : item.started ? `已停留 ${item.displaySeconds} 秒，满 ${requiredExposureSeconds} 秒自动领取` : '进入卡片后开始服务端计时' }}</text>
+            <view class="ad-progress-bar"><view :style="{ width: `${Math.min(100, item.displaySeconds / requiredExposureSeconds * 100)}%` }" /></view>
+          </view>
+        </view>
+        <view v-if="isLoadingMore" class="loading-more">正在加载更多内容…</view>
+        <view v-if="!feedItems.length" class="empty-state">暂无可展示内容，请稍后重试</view>
+      </view>
+    </scroll-view>
+  </view>
+</template>
+
+<script setup>
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { onShow, onHide } from '@dcloudio/uni-app'
+import { useUserStore } from '@/store/user.js'
+import { generateId } from '@/utils/index.js'
+import { ADPID, logAdEvent, playRewardedAd, getAdpid, isAdEnabled } from '@/utils/ad.js'
+import { feedDebug, feedDebugError } from '@/utils/feed-debug.js'
+
+const userStore = useUserStore()
+const user = computed(() => userStore.user || {})
+const feedItems = ref([])
+const isRefreshing = ref(false)
+const isLoadingMore = ref(false)
+const rewardLoading = ref(false)
+const checkInLoading = ref(false)
+const isPageActive = ref(false)
+const activeExposure = ref(null)
+const currentPage = ref(0)
+const hasMore = ref(true)
+const requiredExposureSeconds = computed(() => Math.max(60, Math.ceil(Number(userStore.config.feed_exposure_min_ms || 60000) / 1000)))
+let exposureTimer = null
+let autoLoadTimer = null
+let emptyRetryTimer = null
+let interstitialAd = null
+let _interstitialTimer = null
+let _adLoading = false
+let feedInitStarted = false
+let feedInitialized = false
+let hasShownOnce = false
+
+function normalizeFeedItem(ad) {
+  return {
+    id: String(ad.id),
+    title: String(ad.title || ''),
+    description: String(ad.description || ''),
+    adpid: String(ad.adpid || ''),
+    slotId: String(ad.slotId || ad.slot_id || ''),
+    sessionId: String(ad.sessionId || ad.session_id || ''),
+    imageUrl: String(ad.imageUrl || ''),
+    videoUrl: String(ad.videoUrl || ''),
+    landingUrl: String(ad.landingUrl || ''),
+    mediaType: ['native', 'image', 'video', 'text'].includes(ad.mediaType) ? ad.mediaType : 'text',
+    aspectRatio: Number(ad.aspectRatio) >= 0.25 && Number(ad.aspectRatio) <= 4 ? Number(ad.aspectRatio) : 1.7778,
+    started: false,
+    rewarded: false,
+    claiming: false,
+    closed: false,
+    displaySeconds: 0,
+    eventId: generateId('feed_event')
+  }
+}
+
+async function fetchAdList(page) {
+  feedDebug('request:start', { page, pageSize: 1, active: isPageActive.value })
+  try {
+    const response = await userStore.invoke('getFeedAds', {
+      uid: user.value._id,
+      page,
+      pageSize: 1
+    })
+    const payload = response.data || {}
+    const ads = Array.isArray(payload.ads) ? payload.ads : []
+    feedDebug('request:success', { page, received: ads.length, hasMore: payload.hasMore === true, code: response.code })
+    return { ads: ads.map(normalizeFeedItem), hasMore: payload.hasMore === true }
+  } catch (error) {
+    feedDebugError('request:failed', error, { page })
+    await logAdEvent(userStore, {
+      adpid: getAdpid(userStore, 'feed'),
+      scene: 'coin_page_feed',
+      eventType: 'error',
+      eventId: generateId('feed_fetch_error'),
+      transId: generateId('feed_fetch'),
+      status: 'failed',
+      meta: { page, message: error.message || 'getFeedAds failed' }
+    })
+    return { ads: [], hasMore: true, failed: true }
+  }
+}
+
+async function initFeedList() {
+  if (!isAdEnabled(userStore, 'feed')) {
+    feedItems.value = []
+    feedInitialized = true
+    return
+  }
+  if (feedInitialized && !isPageActive.value) return
+  stopEmptyRetryLoop()
+  feedDebug('list:init', { previousCount: feedItems.value.length, currentPage: currentPage.value })
+  await closeExposure(activeExposure.value)
+  feedItems.value = []
+  activeExposure.value = null
+  currentPage.value = 0
+  hasMore.value = true
+  const result = await fetchAdList(1)
+  if (result.failed) {
+    scheduleEmptyRetry()
+    return
+  }
+  feedItems.value = result.ads
+  currentPage.value = 1
+  hasMore.value = result.hasMore
+  feedInitialized = true
+  feedDebug('list:initialized', { count: feedItems.value.length, currentPage: currentPage.value, hasMore: hasMore.value })
+  if (feedItems.value.length) {
+    stopEmptyRetryLoop()
+    if (isPageActive.value && !activeExposure.value) void startNextExposure()
+  } else {
+    scheduleEmptyRetry()
+  }
+}
+
+onMounted(async () => {
+  try {
+    if (typeof userStore.ensureSessionReady === 'function') {
+      await userStore.ensureSessionReady()
+    }
+    await userStore.getUserInfo()
+  } catch (e) {
+    console.error('[coin] session initialization failed', e)
+  }
+  if (!feedInitStarted) {
+    feedInitStarted = true
+    await initFeedList()
+  } else {
+    feedDebug('list:init-skipped', { reason: 'already-started-by-show' })
+  }
+  preloadInterstitialAd()
+})
+
+onShow(() => {
+  const firstShow = !hasShownOnce
+  hasShownOnce = true
+  isPageActive.value = true
+  feedDebug('lifecycle:show', { count: feedItems.value.length, currentPage: currentPage.value, hasMore: hasMore.value, firstShow })
+  void userStore.getUserInfo()
+  startExposureLoop()
+  startAutoLoadLoop()
+  if (!feedInitStarted || (!firstShow && (!feedItems.value.length || !hasMore.value))) {
+    feedInitStarted = true
+    void initFeedList()
+  } else if (!activeExposure.value) void startNextExposure()
+  
+  // 逻辑复用：显示插屏广告定时器
+  startInterstitialTimer()
+})
+
+onHide(() => {
+  feedDebug('lifecycle:hide', { count: feedItems.value.length, activeExposure: Boolean(activeExposure.value) })
+  isPageActive.value = false
+  stopExposureLoop()
+  stopAutoLoadLoop()
+  stopEmptyRetryLoop()
+  void closeExposure(activeExposure.value)
+===== App.vue =====
+<script setup>
+import { onError, onLaunch, onShow, onHide } from '@dcloudio/uni-app'
+import { useUserStore } from './store/user'
+import { reportError, markPerf, measurePerf } from './utils/index'
+import { checkAndRecoverPendingOrder, preloadRewardedAd } from './utils/ad'
+
+onError((err) => {
+  reportError(err, { scene: 'app_global' })
+})
+
+onLaunch(async () => {
+  markPerf('app_launch_start')
+  console.log('App Launch')
+  console.log(`[App] 应用启动 (${getRuntimeVersion()}), 开始初始化流程`)
+  
+  // 初始化用户数据
+  const userStore = useUserStore()
+  console.log('[App] 调用 userStore.initUser()...')
+  let initResult = await userStore.initUser()
+  console.log('[App] initUser 返回结果:', initResult)
+  
+  // 增加启动重试机制：若首次初始化失败且不是用户主动取消，则尝试静默重试一次
+  if (!initResult.success && initResult.code !== 'USER_CANCEL') {
+    console.log('[App] 首次初始化失败，尝试静默重试...')
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    initResult = await userStore.initUser()
+  }
+  
+  if (!initResult.success) {
+    console.warn('[App] initUser 最终失败:', initResult.message)
+    uni.showToast({ title: '网络连接较弱，部分功能受限', icon: 'none' })
+  }
+  
+  // 恢复未完成的广告订单并预加载广告
+  if (initResult.success) {
+    checkAndRecoverPendingOrder({ store: userStore })
+    preloadRewardedAd(userStore)
+  }
+
+  // 检查用户激活状态
+  checkActivationStatus(userStore)
+  
+  // 等待激活页重定向完成后再显示隐私弹窗
+  setTimeout(() => {
+    checkPrivacyPolicy()
+  }, 800)
+  
+  // 配置全局音频设置
+  configureGlobalAudio()
+  
+  // 检查版本更新
+  checkAppUpdate()
+  
+  markPerf('app_launch_end')
+  measurePerf('app_launch_start', 'app_launch_end')
+})
+
+onShow(() => {
+  console.log('App Show')
+  const userStore = useUserStore()
+  if (userStore.user && userStore.user._id) {
+    // 每次切回前台时同步一次，但为了防止覆盖刚刚领取的奖励，这里可以稍微延迟
+    setTimeout(() => {
+      userStore.getUserInfo().then(res => {
+        if (res.success) {
+          checkActivationStatus(userStore)
+          checkAndRecoverPendingOrder({ store: userStore })
+        }
+      }).catch(err => console.error('[App] onShow 同步用户信息失败:', err))
+    }, 1000)
+  }
+})
+
+onHide(() => {
+  console.log('App Hide')
+})
+
+/**
+ * 检查用户激活状态
+ */
+function checkActivationStatus(userStore) {
+  if (!userStore || !userStore.user) return
+  const activationStatus = userStore.user.activation_status || 'pending'
+  
+  console.log('[App] 用户激活状态校验:', activationStatus)
+  
+  const pages = getCurrentPages()
+  const currentPage = pages.length > 0 ? pages[pages.length - 1].route : ''
+  console.log('[App] 当前页面路由:', currentPage)
+  
+  if (activationStatus !== 'activated') {
+    if (currentPage !== 'pages/activate/activate') {
+      setTimeout(() => {
+        uni.reLaunch({
+          url: '/pages/activate/activate'
+        })
+      }, 200)
+    }
+  } else {
+    if (currentPage === 'pages/activate/activate') {
+      setTimeout(() => {
+        uni.switchTab({
+          url: '/pages/coin/coin'
+        })
+      }, 200)
+    }
+  }
+}
+
+let privacyPromptVisible = false
+function checkPrivacyPolicy() {
+  if (privacyPromptVisible) return
+  const hasAgreed = uni.getStorageSync('pianke_privacy_agreed')
+  if (!hasAgreed) {
+    privacyPromptVisible = true
+    uni.showModal({
+      title: '隐私政策',
+      content: '欢迎使用片刻。我们非常重视您的个人信息和隐私保护。在使用前，请您务必审慎阅读《隐私政策》及《服务协议》全部条款。',
+      confirmText: '同意并继续',
+      cancelText: '不同意',
+      success: (res) => {
+        if (res.confirm) {
+          uni.setStorageSync('pianke_privacy_agreed', true)
+        } else {
+          uni.showModal({
+            title: '提示',
+            content: '我们需要您的授权才能提供完整服务。',
+            confirmText: '去同意',
+            cancelText: '退出应用',
+            success: (retryRes) => {
+              if (retryRes.confirm) {
+                checkPrivacyPolicy()
+              } else {
+                // #ifdef APP-PLUS
+                plus.runtime.quit()
+                // #endif
+              }
+            }
+          })
+        }
+        privacyPromptVisible = false
+      },
+      fail: () => {
+        privacyPromptVisible = false
+      }
+    })
+  }
+}
+
+function getRuntimeVersion() {
+  try {
+    const systemInfo = uni.getSystemInfoSync ? uni.getSystemInfoSync() : {}
+    const version = String(systemInfo.appVersion || systemInfo.appWgtVersion || '').trim()
+    return version ? `v${version}` : '运行时版本未知'
+  } catch (_) {
+    return '运行时版本未知'
+  }
+}
+
+function checkAppUpdate() {
+  console.log(`[App] 当前版本: ${getRuntimeVersion()}`)
+}
+
+function configureGlobalAudio() {
+  console.log('全局音频配置完成')
+}
+</script>
+
+<style>
+page {
+  background-color: #0d0d1a;
+  color: rgba(255, 255, 255, 0.85);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 28rpx;
+  line-height: 1.6;
+  box-sizing: border-box;
+}
+
+.glass {
+  background-color: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-strong {
+  background-color: rgba(255, 255, 255, 0.09);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1rpx solid rgba(255, 255, 255, 0.12);
+}
+
+.color-primary { color: #4a8db7; }
+.color-accent { color: #d9b450; }
+.text-primary { color: rgba(255, 255, 255, 0.85); }
+.text-secondary { color: rgba(255, 255, 255, 0.5); }
+.text-muted { color: rgba(255, 255, 255, 0.25); }
+
+@keyframes breathe {
+  0% { box-shadow: 0 0 16rpx rgba(217, 180, 80, 0.2), 0 0 32rpx rgba(217, 180, 80, 0.08); }
+  100% { box-shadow: 0 0 40rpx rgba(217, 180, 80, 0.4), 0 0 80rpx rgba(217, 180, 80, 0.15); }
+}
+
+.breathing-light { animation: breathe 2.5s infinite alternate ease-in-out; }
+
+@keyframes flashAmber {
+  0% { background-color: rgba(217, 180, 80, 0.3); transform: scale(1.02); }
+  100% { background-color: rgba(255, 255, 255, 0.06); transform: scale(1); }
+}
+
+.flash-amber { animation: flashAmber 1.2s ease-out; }
+.tabular-nums { font-variant-numeric: tabular-nums; }
+.font-serif { font-family: 'STSongti-SC-Regular', 'Songti SC', 'SimSun', serif; }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+</style>
+===== store/user.js =====
+import { computed, ref, watch } from 'vue'
+import { defineStore } from 'pinia'
+import { formatDuration, formatDateTime, generateId, normalizeResult } from '@/utils/index.js'
+
+const STORAGE_KEY = 'pianke_uid'
+const AUTH_TOKEN_KEY = 'pianke_auth_token'
+const INSTALLATION_KEY = 'pianke_installation_id'
+const RELAX_SYNC_PENDING_KEY = 'pianke_relax_sync_pending'
+const DEFAULT_CONFIG = {
+  daily_ad_limit: 100,
+  daily_feed_limit: 100,
+  rewarded_video_gold: 100,
+  rewarded_video_time: 300,
+  feed_exposure_min_ms: 60000,
+  feed_exposure_reward_time: 60,
+  coupon_15min_cost: 300,
+  coupon_15min_time: 900,
+  coupon_15min_daily_limit: 3,
+  coupon_60min_cost: 1000,
+  coupon_60min_time: 3600,
+  coupon_60min_daily_limit: 1,
+  adpid_rewarded: '',
+  adpid_feed: '',
+  adpid_interstitial: '',
+  ad_enabled_rewarded: true,
+  ad_enabled_feed: true,
+  ad_enabled_interstitial: true,
+  legal_terms_url: 'https://env-00jy6ojekxqo-static.normal.cloudstatic.cn/user/service.html',
+  legal_privacy_url: 'https://env-00jy6ojekxqo-static.normal.cloudstatic.cn/user/privacy.html'
+}
+
+export const useUserStore = defineStore('user', () => {
+  const user = ref({
+    _id: '',
+    gold_balance: 0,
+    relaxation_time: 0,
+    relaxation_started_at: 0,
+    relaxation_expire_at: 0,
+    total_ad_views: 0,
+    daily_ad_count: 0,
+    daily_ad_date: '',
+    daily_feed_count: 0,
+    daily_feed_date: '',
+    invite_code: '',
+    coupon_15min_today: 0,
+    coupon_60min_today: 0,
+    coupon_date: '',
+    invite_bind_used: false,
+    activation_status: 'pending',
+    continuous_checkin: 0,
+    last_checkin_date: '',
+    created_at: 0,
+    updated_at: 0
+  })
+  const goldLogs = ref([])
+  const goldLogsTotal = ref(0)
+  const config = ref({ ...DEFAULT_CONFIG })
+  const serverTimestamp = ref(0)
+  const serverDate = ref('')
+  const currentTime = ref(Date.now())
+  const isLoading = ref(false)
+  const error = ref('')
+  const initialized = ref(false)
+  const clockOffset = ref(0)
+  const isSyncing = ref(false)
+  let syncPromise = null
+  let relaxSyncPromise = null
+  let eventHandler = null
+  let timer = null
+  let lastSyncTimestamp = 0
+  let statsTimer = null
+  const USER_INFO_SYNC_COOLDOWN_MS = 1500
+  let lastUserInfoSuccessAt = 0
+  let lastAssetUpdateTime = 0
+  let lastConfigFetchAt = 0
+
+  function startClock() {
+    if (timer) return
+    timer = setInterval(() => { currentTime.value = Date.now() }, 1000)
+  }
+
+  function getOrCreateUid() {
+    return user.value._id || uni.getStorageSync(STORAGE_KEY) || ''
+  }
+
+  function getOrCreateInstallationId() {
+    let installationId = uni.getStorageSync(INSTALLATION_KEY)
+    if (!installationId) {
+      installationId = generateId('device')
+      uni.setStorageSync(INSTALLATION_KEY, installationId)
+    }
+    return installationId
+  }
+
+  function saveAuthToken(token) {
+    if (token) {
+      uni.setStorageSync(AUTH_TOKEN_KEY, String(token))
+    }
+  }
+
+  function getAuthToken() {
+    return uni.getStorageSync(AUTH_TOKEN_KEY) || ''
+  }
+
+  function applyAsset(data = {}) {
+    if (data.auth_token) saveAuthToken(data.auth_token)
+    if (!data.user) return
+    
+    const updateTime = Number(data.server_timestamp || Date.now())
+    if (updateTime < lastAssetUpdateTime) return
+    lastAssetUpdateTime = updateTime
+
+    user.value = { ...user.value, ...data.user }
+    if (data.config) config.value = { ...config.value, ...data.config }
+    
+    if (data.server_timestamp) {
+      serverTimestamp.value = Number(data.server_timestamp)
+      clockOffset.value = serverTimestamp.value - Date.now()
+    }
+    if (data.server_date) serverDate.value = String(data.server_date)
+    
+    if (data.user.relaxation_expire_at) {
+      targetTime.value = Number(data.user.relaxation_expire_at) - clockOffset.value
+    } else {
+      targetTime.value = Date.now() + Math.max(0, Number(data.user.relaxation_time || 0)) * 1000
+    }
+  }
+
+  const targetTime = ref(0)
+  const remainingSeconds = computed(() => Math.max(0, Math.ceil((targetTime.value - currentTime.value) / 1000)))
+  const isActive = computed(() => remainingSeconds.value > 0)
+
+  watch(isActive, (active) => {
+    if (active) {
+      lastSyncTimestamp = Date.now()
+      if (!statsTimer) {
+        statsTimer = setInterval(() => {
+          const now = Date.now()
+          const diff = Math.floor((now - lastSyncTimestamp) / 1000)
+          if (diff >= 30) {
+            syncRelaxSeconds(diff)
+            lastSyncTimestamp = now
+          }
+        }, 5000)
+      }
+    } else {
+      if (statsTimer) {
+        const diff = Math.floor((Date.now() - lastSyncTimestamp) / 1000)
+        if (diff > 0) syncRelaxSeconds(diff)
+        clearInterval(statsTimer)
+        statsTimer = null
+      }
+    }
+  })
+
+  async function syncRelaxSeconds(seconds) {
+    if (!user.value._id || seconds <= 0 || relaxSyncPromise) return
+    const requestedSeconds = Math.min(360, Math.max(1, Math.floor(seconds)))
+    let pending = uni.getStorageSync(RELAX_SYNC_PENDING_KEY)
+    if (!pending || pending.uid !== user.value._id || !pending.idempotency_key) {
+      pending = {
+        uid: user.value._id,
+        seconds: requestedSeconds,
+        idempotency_key: generateId('relax_sync'),
+        created_at: Date.now()
+      }
+      uni.setStorageSync(RELAX_SYNC_PENDING_KEY, pending)
+    }
+    const syncPayload = { uid: user.value._id, increment_seconds: Math.min(360, Math.max(1, Number(pending.seconds) || requestedSeconds)), idempotency_key: pending.idempotency_key }
+    relaxSyncPromise = (async () => {
+      try {
+        const response = await invoke('syncRelaxStats', syncPayload)
+        if (response.code === 0 && response.data) {
+          applyAsset(response.data)
+          uni.removeStorageSync(RELAX_SYNC_PENDING_KEY)
+        }
+      } catch (e) {
+        // 保留 pending idempotency_key，网络重试不会重复扣时。
+      } finally {
+        relaxSyncPromise = null
+      }
+    })()
+    return relaxSyncPromise
+  }
+  
+  const formattedRelaxTime = computed(() => formatDuration(remainingSeconds.value))
+  const dailyAdLimit = computed(() => Math.max(1, Number(config.value.daily_ad_limit || DEFAULT_CONFIG.daily_ad_limit)))
+  const adProgress = computed(() => Math.min(100, Math.round((Number(user.value.daily_ad_count || 0) / dailyAdLimit.value) * 100)))
+  const dailyFeedLimit = computed(() => Math.max(1, Number(config.value.daily_feed_limit || DEFAULT_CONFIG.daily_feed_limit)))
+  const feedProgress = computed(() => Math.min(100, Math.round((Number(user.value.daily_feed_count || 0) / dailyFeedLimit.value) * 100)))
+  const canExchange15min = computed(() => Number(user.value.gold_balance) >= Number(config.value.coupon_15min_cost) && Number(user.value.coupon_15min_today) < Number(config.value.coupon_15min_daily_limit))
+  const canExchange60min = computed(() => Number(user.value.gold_balance) >= Number(config.value.coupon_60min_cost) && Number(user.value.coupon_60min_today) < Number(config.value.coupon_60min_daily_limit))
+  const isTodayCheckedIn = computed(() => {
+    const today = serverDate.value || new Date().toISOString().split('T')[0]
+    return Boolean(user.value.last_checkin_date && user.value.last_checkin_date === today)
+  })
+
+  async function invoke(name, data = {}) {
+    if (typeof uniCloud === 'undefined') throw new Error('云服务未就绪')
+    const authToken = getAuthToken()
+    const requestData = { ...data, device_id: data.device_id || getOrCreateInstallationId() }
+    if (authToken) requestData.auth_token = authToken
+    if (name !== 'initUser' && user.value._id && !requestData.uid) requestData.uid = user.value._id
+    
+    const response = normalizeResult(await uniCloud.callFunction({ name, data: requestData }))
+    if (!response || Number(response.code) !== 0) {
+      const err = new Error(response?.message || '请求失败')
+      err.code = response?.code
+      if ([401, 1403].includes(Number(err.code))) {
+        uni.removeStorageSync(AUTH_TOKEN_KEY)
+        initialized.value = false
+      }
+      throw err
+    }
+    return response
+  }
+
+  async function ensureSessionReady() {
+    if (initialized.value) return { success: true }
+    return syncUser('initUser')
+  }
+
+  async function syncUser(name = 'getUserInfo', options = {}) {
+    const force = Boolean(options?.force)
+    if (name === 'getUserInfo' && !force && lastUserInfoSuccessAt > 0 && Date.now() - lastUserInfoSuccessAt < USER_INFO_SYNC_COOLDOWN_MS) {
+      return { success: true, data: { user: user.value, server_timestamp: serverTimestamp.value, server_date: serverDate.value, cached: true } }
+    }
+    if (syncPromise) return syncPromise
+    syncPromise = (async () => {
+      isLoading.value = true
+      try {
+        const req = name === 'initUser' ? { device_id: getOrCreateInstallationId() } : { uid: getOrCreateUid() }
+        const promises = [invoke(name, req)]
+        
+        // 缓存策略：60秒 TTL，运营配置修改后最多 60 秒自然生效
+        if (Date.now() - lastConfigFetchAt > 60000) {
+          promises.push(invoke('getAppConfig'))
+        }
+
+        const [userRes, configRes] = await Promise.allSettled(promises)
+        if (userRes.status === 'fulfilled') {
+          applyAsset(userRes.value.data)
+          if (name === 'getUserInfo') lastUserInfoSuccessAt = Date.now()
+        } else {
+          throw userRes.reason
+        }
+        
+        if (configRes && configRes.status === 'fulfilled') {
+          config.value = { ...config.value, ...(configRes.value.data || {}) }
+          lastConfigFetchAt = Date.now()
+        }
+        
+        initialized.value = true
+        return { success: true, data: userRes.value.data }
+      } catch (err) {
+        error.value = err.message
+        return { success: false, message: err.message, code: err.code }
+      } finally {
+        isLoading.value = false
+        syncPromise = null
+===== utils/ad.js =====
+import { generateId } from './index.js'
+
+export const ADPID = {
+  rewarded: '', 
+  feed: '',
+  interstitial: ''
+}
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+function showLoading() {
+  if (typeof plus !== 'undefined' && plus.nativeUI) {
+    plus.nativeUI.showWaiting('', { modal: true, back: 'transmit', padding: '10px' })
+  }
+}
+
+function hideLoading() {
+  if (typeof plus !== 'undefined' && plus.nativeUI) {
+    plus.nativeUI.closeWaiting()
+  }
+}
+
+export function getAdpid(store, type) {
+  const val = store?.config?.[`adpid_${type}`] || ADPID[type]
+  return String(typeof val === 'object' ? (val.value || val.config_value?.value || '') : (val || ''))
+}
+
+export function isAdEnabled(store, type) {
+  const enabled = store?.config?.[`ad_enabled_${type}`]
+  return enabled === undefined ? true : Boolean(enabled)
+}
+
+let _rewardedAd = null
+let _isLoading = false
+
+/**
+ * 预加载激励视频广告
+ */
+export function preloadRewardedAd(store) {
+  if (!isAdEnabled(store, 'rewarded') || _rewardedAd || _isLoading) return
+  const adpid = getAdpid(store, 'rewarded')
+  if (!adpid) return
+  
+  _isLoading = true
+  _rewardedAd = uni.createRewardedVideoAd({ adpid: String(adpid) })
+  _rewardedAd.onLoad(() => { _isLoading = false })
+  _rewardedAd.onError(() => { _isLoading = false; _rewardedAd = null })
+  _rewardedAd.load()
+}
+
+/**
+ * 激励视频播放
+ */
+export async function playRewardedAd({ store, scene, rewardContext = {}, onRewarded }) {
+  const allowedScenes = ['relax', 'coin_page_quick_earn']
+  if (!allowedScenes.includes(scene)) throw new Error('该场景不支持获取奖励')
+  if (!isAdEnabled(store, 'rewarded')) throw new Error('当前功能暂未开启')
+  if (typeof store.ensureSessionReady === 'function') await store.ensureSessionReady()
+  
+  const adpid = getAdpid(store, 'rewarded')
+  if (!adpid) throw new Error('广告位配置错误')
+
+  showLoading()
+  try {
+    const transId = generateId(`reward_${scene}`)
+    const orderRes = await store.invoke('createRewardOrder', { scene, adpid, reward_context: rewardContext, idempotency_key: transId })
+    if (orderRes?.code !== 0) throw new Error(orderRes?.message || '订单创建失败')
+    
+    const orderId = orderRes.data.order_id
+    
+    // 实例化广告并配置回调
+    const adInstance = _rewardedAd || uni.createRewardedVideoAd({ adpid: String(adpid) })
+    adInstance.urlCallback = {
+      userId: String(store.user._id),
+      extra: JSON.stringify({ scene, order_id: orderId, request_id: transId })
+    }
+
+    return new Promise((resolve, reject) => {
+      const cleanup = () => {
+        adInstance.offLoad()
+        adInstance.offError()
+        adInstance.offClose()
+        hideLoading()
+        _rewardedAd = null
+        preloadRewardedAd(store)
+      }
+
+      adInstance.onLoad(() => { hideLoading(); adInstance.show() })
+      adInstance.onError((err) => { cleanup(); reject(new Error(err.errMsg || '广告加载失败')) })
+      adInstance.onClose(async (res) => {
+        if (res?.isEnded) {
+          try {
+            await store.invoke('reportAdCompleted', { order_id: orderId })
+          } catch (error) {
+            if ([401, 1403].includes(Number(error?.code))) {
+              try { await store.ensureSessionReady() } catch (_) {}
+            }
+          }
+
+          // 阶梯式轮询：500/1000/1500/2000/2000ms，共 7 秒；超时进入延迟到账态
+          let rewardData = null
+          const pollIntervals = [300, 500, 800, 1200, 1800, 2500]
+          for (let ms of pollIntervals) {
+            await wait(ms)
+            let query = null
+            try {
+              query = await store.invoke('queryRewardOrder', { order_id: orderId })
+            } catch (_) {
+              query = null
+            }
+            if (['rewarded'].includes(query?.data?.status)) {
+              const refreshed = await store.getUserInfo({ force: true })
+              rewardData = refreshed?.data || { user: store.user }
+              break
+            }
+          }
+
+          if (!rewardData) {
+            // 超时未即时同步：强制拉取资产，但明确标记为“延迟到账”，禁止前端猜测已到账。
+            const refreshed = await store.getUserInfo({ force: true })
+            rewardData = refreshed?.data || { user: store.user }
+            rewardData.pending = true
+          }
+
+          if (onRewarded) onRewarded(rewardData, { late: Boolean(rewardData.pending), meta: { late: Boolean(rewardData.pending), order_id: orderId } })
+          cleanup()
+          resolve(rewardData)
+        } else {
+          await store.invoke('cancelRewardOrder', { order_id: orderId, reason: 'middle_exit' })
+          cleanup()
+          reject(new Error('完整观看视频才能获得奖励'))
+        }
+      })
+
+      if (!_isLoading && _rewardedAd) {
+        hideLoading()
+        adInstance.show().catch(() => {
+          adInstance.load().catch(e => { cleanup(); reject(e) })
+        })
+      }
+    })
+  } catch (e) {
+    hideLoading()
+    throw e
+  }
+}
+
+/**
+ * 检查并恢复待处理订单（仅限真正未完成发放且在合理时间窗口内的订单）
+ */
+export async function checkAndRecoverPendingOrder({ store }) {
+  if (!store?.user?._id || !isAdEnabled(store, 'rewarded')) return
+  try {
+    const res = await store.invoke('queryRewardOrder', { uid: store.user._id, status: 'created' })
+    if (res?.data?.order_id && res.data.created_at && (Date.now() - res.data.created_at < 600000)) {
+      // 订单在10分钟内创建且未完成，可尝试同步状态或提示用户
+      const query = await store.invoke('queryRewardOrder', { order_id: res.data.order_id })
+      if (query?.data?.status === 'rewarded') {
+        uni.showToast({ title: '奖励已恢复', icon: 'success' })
+        await store.getUserInfo({ force: true })
+      }
+    }
+  } catch (_) {}
+}
+
+export async function logAdEvent(store, { adpid, scene, eventType, eventId, status = 'success', transId = '', meta = {} }) {
+  if (!store?.user?._id) return
+  try {
+    await store.invoke('logAdEvent', {
+      uid: store.user._id, adpid, scene, event_type: eventType,
+      event_id: eventId || generateId(`ad_${eventType}`),
+      trans_id: transId, status, meta
+    })
+  } catch (_) {}
+}

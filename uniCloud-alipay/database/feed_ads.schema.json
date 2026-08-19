@@ -1,0 +1,29 @@
+{
+  "bsonType": "object",
+  "required": ["_id", "title", "description", "adpid", "slot_id", "media_type", "is_active", "sort_order", "created_at"],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": { "bsonType": "string" },
+    "title": { "bsonType": "string", "minLength": 1, "maxLength": 120 },
+    "description": { "bsonType": "string", "maxLength": 500 },
+    "adpid": { "bsonType": "string", "minLength": 1, "maxLength": 120 },
+    "slot_id": { "bsonType": "string", "minLength": 1, "maxLength": 120 },
+    "media_type": { "bsonType": "string", "enum": ["native", "image", "video", "text"] },
+    "image_url": { "bsonType": "string", "maxLength": 1000 },
+    "video_url": { "bsonType": "string", "maxLength": 1000 },
+    "landing_url": { "bsonType": "string", "maxLength": 1000 },
+    "width": { "bsonType": "double", "minimum": 1, "maximum": 4096 },
+    "height": { "bsonType": "double", "minimum": 1, "maximum": 4096 },
+    "aspect_ratio": { "bsonType": "double", "minimum": 0.25, "maximum": 4 },
+    "source": { "bsonType": "string", "maxLength": 80 },
+    "is_active": { "bsonType": "bool" },
+    "sort_order": { "bsonType": "int" },
+    "created_at": { "bsonType": "long" },
+    "updated_at": { "bsonType": "long" }
+  }
+}

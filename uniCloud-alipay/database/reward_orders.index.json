@@ -1,0 +1,73 @@
+[
+  {
+    "IndexName": "order_id_unique",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "order_id",
+          "Direction": "1",
+          "Type": "varchar"
+        }
+      ],
+      "MgoIsUnique": true
+    },
+    "MgoIsSparse": false
+  },
+  {
+    "IndexName": "idempotency_key_unique",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "idempotency_key",
+          "Direction": "1",
+          "Type": "varchar"
+        }
+      ],
+      "MgoIsUnique": true
+    },
+    "MgoIsSparse": false
+  },
+  {
+    "IndexName": "uid_status_updated_at",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "uid",
+          "Direction": "1",
+          "Type": "varchar"
+        },
+        {
+          "Name": "status",
+          "Direction": "1",
+          "Type": "varchar"
+        },
+        {
+          "Name": "updated_at",
+          "Direction": "-1",
+          "Type": "long"
+        }
+      ],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  },
+  {
+    "IndexName": "uid_created_at",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "uid",
+          "Direction": "1",
+          "Type": "varchar"
+        },
+        {
+          "Name": "created_at",
+          "Direction": "-1",
+          "Type": "long"
+        }
+      ]
+    },
+    "MgoIsUnique": false,
+    "MgoIsSparse": false
+  }
+]

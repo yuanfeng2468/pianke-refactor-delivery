@@ -1,0 +1,35 @@
+[
+  {
+    "IndexName": "idempotency_key_unique",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "idempotency_key",
+          "Direction": "1",
+          "Type": "varchar"
+        }
+      ],
+      "MgoIsUnique": true
+    },
+    "MgoIsSparse": false
+  },
+  {
+    "IndexName": "uid_created_at",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "uid",
+          "Direction": "1",
+          "Type": "varchar"
+        },
+        {
+          "Name": "created_at",
+          "Direction": "-1",
+          "Type": "long"
+        }
+      ],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  }
+]

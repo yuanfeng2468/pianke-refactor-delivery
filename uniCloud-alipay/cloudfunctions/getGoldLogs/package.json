@@ -1,0 +1,9 @@
+{
+  "name": "getGoldLogs",
+  "version": "1.0.0",
+  "description": "获取用户金币流水记录",
+  "main": "index.js",
+  "dependencies": {
+    "pianke-common": "file:../common/pianke-common"
+  }
+}

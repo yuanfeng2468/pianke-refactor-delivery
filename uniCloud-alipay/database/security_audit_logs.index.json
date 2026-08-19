@@ -1,0 +1,40 @@
+[
+  {
+    "IndexName": "security_audit_event_id_unique",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [{ "Name": "event_id", "Direction": "1", "Type": "varchar" }],
+      "MgoIsUnique": true
+    },
+    "MgoIsSparse": false
+  },
+  {
+    "IndexName": "security_audit_created_at",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [{ "Name": "created_at", "Direction": "-1", "Type": "long" }],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  },
+  {
+    "IndexName": "security_audit_severity_created_at",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "severity", "Direction": "1", "Type": "varchar" },
+        { "Name": "created_at", "Direction": "-1", "Type": "long" }
+      ],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  },
+  {
+    "IndexName": "security_audit_user_created_at",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "user_id", "Direction": "1", "Type": "varchar" },
+        { "Name": "created_at", "Direction": "-1", "Type": "long" }
+      ],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  }
+]

@@ -1,0 +1,21 @@
+{
+  "bsonType": "object",
+  "required": ["_id", "event_id", "action", "severity", "result", "actor_type", "created_at"],
+  "permission": { "read": false, "create": false, "update": false, "delete": false },
+  "properties": {
+    "_id": { "description": "安全审计事件唯一 ID", "bsonType": "string" },
+    "event_id": { "description": "事件幂等标识", "bsonType": "string" },
+    "action": { "description": "审计动作", "bsonType": "string", "maxLength": 80 },
+    "severity": { "description": "风险级别", "bsonType": "string", "enum": ["info", "warning", "high", "critical"] },
+    "result": { "description": "处理结果", "bsonType": "string", "enum": ["success", "rejected", "skipped", "error"] },
+    "actor_type": { "description": "行为主体类型", "bsonType": "string" },
+    "actor_id": { "description": "行为主体脱敏标识", "bsonType": "string" },
+    "user_id": { "description": "关联用户 ID", "bsonType": "string" },
+    "resource": { "description": "受影响资源", "bsonType": "string" },
+    "request_id": { "description": "请求关联 ID", "bsonType": "string" },
+    "ip_address": { "description": "请求 IP", "bsonType": "string" },
+    "device_id": { "description": "设备标识", "bsonType": "string" },
+    "meta": { "description": "脱敏扩展信息", "bsonType": "object" },
+    "created_at": { "description": "服务端时间戳（毫秒）", "bsonType": "long" }
+  }
+}

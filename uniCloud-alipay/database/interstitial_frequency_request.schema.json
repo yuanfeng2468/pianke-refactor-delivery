@@ -1,0 +1,13 @@
+{
+  "bsonType": "object",
+  "required": ["_id", "request_id", "user_id", "scene", "result", "created_at"],
+  "permission": { "read": false, "create": false, "update": false, "delete": false },
+  "properties": {
+    "_id": { "description": "频控请求唯一 ID", "bsonType": "string" },
+    "request_id": { "description": "客户端/服务端请求幂等键", "bsonType": "string" },
+    "user_id": { "description": "用户 ID", "bsonType": "string" },
+    "scene": { "description": "插屏触发场景", "bsonType": "string" },
+    "result": { "description": "频控决策结果", "bsonType": "object" },
+    "created_at": { "description": "服务端创建时间戳", "bsonType": "long" }
+  }
+}

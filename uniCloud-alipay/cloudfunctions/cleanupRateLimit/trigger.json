@@ -1,0 +1,10 @@
+{
+  "version": "1.0.0",
+  "triggers": [
+    {
+      "name": "cleanupRateLimitTimer",
+      "type": "timer",
+      "config": "0 0 */4 * * *"
+    }
+  ]
+}

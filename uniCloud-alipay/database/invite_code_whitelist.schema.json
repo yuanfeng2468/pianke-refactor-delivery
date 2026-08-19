@@ -1,0 +1,55 @@
+{
+  "bsonType": "object",
+  "required": ["_id", "code", "status", "max_uses", "current_uses", "created_by", "created_at", "reward_gold"],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "description": "邀请码",
+      "bsonType": "string"
+    },
+    "code": {
+      "description": "邀请码值",
+      "bsonType": "string"
+    },
+    "status": {
+      "description": "状态：active/disabled",
+      "bsonType": "string",
+      "enum": ["active", "disabled"]
+    },
+    "max_uses": {
+      "description": "最大使用次数，-1表示无限",
+      "bsonType": "int"
+    },
+    "current_uses": {
+      "description": "当前使用次数",
+      "bsonType": "int",
+      "minimum": 0
+    },
+    "created_by": {
+      "description": "创建者/运营人员",
+      "bsonType": "string"
+    },
+    "created_at": {
+      "description": "创建时间戳（毫秒）",
+      "bsonType": "long"
+    },
+    "expires_at": {
+      "description": "过期时间戳（可选）",
+      "bsonType": "long"
+    },
+    "reward_gold": {
+      "description": "激活奖励金币数",
+      "bsonType": "int",
+      "minimum": 0
+    },
+    "description": {
+      "description": "描述/备注",
+      "bsonType": "string"
+    }
+  }
+}

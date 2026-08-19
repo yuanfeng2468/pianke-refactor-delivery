@@ -1,0 +1,36 @@
+{
+  "bsonType": "object",
+  "required": ["_id", "config_key", "config_value", "updated_by", "updated_at"],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "description": "配置ID",
+      "bsonType": "string"
+    },
+    "config_key": {
+      "description": "配置键（唯一）",
+      "bsonType": "string"
+    },
+    "config_value": {
+      "description": "配置值（支持多种类型）",
+      "bsonType": "object"
+    },
+    "description": {
+      "description": "描述",
+      "bsonType": "string"
+    },
+    "updated_by": {
+      "description": "更新者",
+      "bsonType": "string"
+    },
+    "updated_at": {
+      "description": "更新时间戳（毫秒）",
+      "bsonType": "long"
+    }
+  }
+}

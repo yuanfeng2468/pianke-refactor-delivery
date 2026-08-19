@@ -1,0 +1,102 @@
+{
+  "bsonType": "object",
+  "required": [
+    "_id",
+    "order_id",
+    "uid",
+    "scene",
+    "status",
+    "reward_gold",
+    "created_at",
+    "updated_at"
+  ],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "description": "内部 ID",
+      "bsonType": "string"
+    },
+    "order_id": {
+      "description": "广告订单号",
+      "bsonType": "string"
+    },
+    "uid": {
+      "description": "用户 ID",
+      "bsonType": "string"
+    },
+    "scene": {
+      "description": "广告场景",
+      "bsonType": "string"
+    },
+    "reward_type": {
+      "description": "服务端锁定的奖励类型",
+      "bsonType": "string"
+    },
+    "reward_context": {
+      "description": "服务端净化后的业务上下文快照，不含可直接信任的金额",
+      "bsonType": "object"
+    },
+    "status": {
+      "bsonType": "string",
+      "enum": [
+        "created",
+        "rewarded",
+        "failed"
+      ]
+    },
+    "reward_gold": {
+      "description": "奖励金币",
+      "bsonType": "int",
+      "minimum": 0
+    },
+    "trans_id": {
+      "description": "广告平台交易 ID",
+      "bsonType": "string"
+    },
+    "device_id": {
+      "description": "设备 ID",
+      "bsonType": "string"
+    },
+    "ip": {
+      "description": "IP",
+      "bsonType": "string"
+    },
+    "ua": {
+      "description": "User-Agent",
+      "bsonType": "string"
+    },
+    "created_at": {
+      "description": "创建时间",
+      "bsonType": "long"
+    },
+    "updated_at": {
+      "description": "更新时间",
+      "bsonType": "long"
+    },
+    "callback_time": {
+      "description": "回调时间",
+      "bsonType": "long"
+    },
+    "reward_time": {
+      "description": "发奖时间",
+      "bsonType": "long"
+    },
+    "fail_reason": {
+      "description": "失败原因",
+      "bsonType": "string"
+    },
+    "idempotency_key": {
+      "description": "客户端幂等键",
+      "bsonType": "string"
+    },
+    "client_completed_at": {
+      "description": "客户端完成观看上报时间，仅作遥测，不参与发奖判定",
+      "bsonType": "long"
+    }
+  }
+}

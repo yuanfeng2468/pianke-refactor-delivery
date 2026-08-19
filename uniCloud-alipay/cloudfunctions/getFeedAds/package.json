@@ -1,0 +1,7 @@
+{
+  "name": "get-feed-ads",
+  "version": "1.0.0",
+  "dependencies": {
+    "pianke-common": "file:../common/pianke-common"
+  }
+}

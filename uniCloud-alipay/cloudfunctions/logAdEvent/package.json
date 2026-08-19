@@ -1,0 +1,9 @@
+{
+  "name": "logAdEvent",
+  "version": "1.0.0",
+  "description": "广告事件日志记录",
+  "main": "index.js",
+  "dependencies": {
+    "pianke-common": "file:../common/pianke-common"
+  }
+}

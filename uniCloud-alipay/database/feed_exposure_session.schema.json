@@ -1,0 +1,21 @@
+{
+  "bsonType": "object",
+  "required": ["_id", "session_id", "slot_id", "user_id", "adpid", "scene", "status", "created_at", "expires_at"],
+  "permission": { "read": false, "create": false, "update": false, "delete": false },
+  "properties": {
+    "_id": { "description": "曝光会话唯一 ID", "bsonType": "string" },
+    "session_id": { "description": "客户端生成的曝光会话键", "bsonType": "string" },
+    "slot_id": { "description": "信息流广告槽位键，由服务端广告记录签发", "bsonType": "string" },
+    "issued_at": { "description": "服务端签发时间戳", "bsonType": "long" },
+    "expires_at": { "description": "曝光会话过期时间戳", "bsonType": "long" },
+    "user_id": { "description": "用户 ID", "bsonType": "string" },
+    "adpid": { "description": "信息流广告位", "bsonType": "string" },
+    "scene": { "description": "信息流场景", "bsonType": "string", "enum": ["coin_page_feed"] },
+    "status": { "description": "issued/active/closed/rewarded/expired", "bsonType": "string", "enum": ["issued", "active", "closed", "rewarded", "expired"] },
+    "started_at": { "description": "服务端曝光开始时间戳", "bsonType": "long" },
+    "rewarded_at": { "description": "服务端奖励时间戳", "bsonType": "long" },
+    "result": { "description": "最近一次服务端结果快照", "bsonType": "object" },
+    "created_at": { "description": "创建时间戳", "bsonType": "long" },
+    "updated_at": { "description": "更新时间戳", "bsonType": "long" }
+  }
+}

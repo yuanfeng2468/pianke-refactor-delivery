@@ -1,0 +1,61 @@
+{
+  "bsonType": "object",
+  "required": [
+    "_id",
+    "uid",
+    "action",
+    "decision",
+    "created_at"
+  ],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "description": "记录 ID",
+      "bsonType": "string"
+    },
+    "uid": {
+      "description": "用户 ID",
+      "bsonType": "string"
+    },
+    "device_id": {
+      "description": "设备 ID",
+      "bsonType": "string"
+    },
+    "ip": {
+      "description": "IP",
+      "bsonType": "string"
+    },
+    "ua": {
+      "description": "User-Agent",
+      "bsonType": "string"
+    },
+    "action": {
+      "bsonType": "string",
+      "enum": [
+        "ad",
+        "invite",
+        "exchange"
+      ]
+    },
+    "decision": {
+      "bsonType": "string",
+      "enum": [
+        "pass",
+        "block"
+      ]
+    },
+    "reason": {
+      "description": "风控原因",
+      "bsonType": "string"
+    },
+    "created_at": {
+      "description": "创建时间",
+      "bsonType": "long"
+    }
+  }
+}

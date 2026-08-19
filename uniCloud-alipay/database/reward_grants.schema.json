@@ -1,0 +1,68 @@
+{
+  "bsonType": "object",
+  "required": [
+    "_id",
+    "trans_id",
+    "user_id",
+    "grant_type",
+    "created_at"
+  ],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "description": "奖励凭证唯一 ID",
+      "bsonType": "string"
+    },
+    "trans_id": {
+      "description": "业务幂等键",
+      "bsonType": "string"
+    },
+    "user_id": {
+      "description": "受奖励用户 ID",
+      "bsonType": "string"
+    },
+    "grant_type": {
+      "description": "奖励类型",
+      "bsonType": "string"
+    },
+    "adpid": {
+      "description": "关联广告位",
+      "bsonType": "string"
+    },
+    "scene": {
+      "description": "关联场景",
+      "bsonType": "string"
+    },
+    "reward_type": {
+      "description": "服务端锁定的奖励类型",
+      "bsonType": "string"
+    },
+    "reward_context": {
+      "description": "奖励业务上下文快照",
+      "bsonType": "object"
+    },
+    "gold_amount": {
+      "description": "金币奖励",
+      "bsonType": "int",
+      "minimum": 0
+    },
+    "time_amount": {
+      "description": "放松时长奖励（秒）",
+      "bsonType": "int",
+      "minimum": 0
+    },
+    "created_at": {
+      "description": "服务端创建时间戳（毫秒）",
+      "bsonType": "long"
+    },
+    "order_id": {
+      "description": "关联业务订单号；广告奖励使用订单幂等约束",
+      "bsonType": "string"
+    }
+  }
+}

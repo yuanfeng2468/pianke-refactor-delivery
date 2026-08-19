@@ -1,0 +1,9 @@
+{
+  "name": "cleanupFeedSessions",
+  "version": "1.0.0",
+  "description": "清理过期信息流曝光会话",
+  "main": "index.js",
+  "dependencies": {
+    "pianke-common": "file:../common/pianke-common"
+  }
+}

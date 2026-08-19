@@ -1,0 +1,10 @@
+[
+  {
+    "IndexName": "config_key_unique",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [{ "Name": "config_key", "Direction": "1", "Type": "varchar" }],
+      "MgoIsUnique": true
+    },
+    "MgoIsSparse": false
+  }
+]

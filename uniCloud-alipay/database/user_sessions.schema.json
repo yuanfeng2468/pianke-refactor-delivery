@@ -1,0 +1,20 @@
+{
+  "bsonType": "object",
+  "required": ["_id", "user_id", "token_hash", "created_at", "expires_at", "revoked"],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": { "bsonType": "string" },
+    "user_id": { "bsonType": "string" },
+    "token_hash": { "bsonType": "string" },
+    "device_id": { "bsonType": "string" },
+    "created_at": { "bsonType": "long" },
+    "expires_at": { "bsonType": "long" },
+    "last_seen_at": { "bsonType": "long" },
+    "revoked": { "bsonType": "bool" }
+  }
+}

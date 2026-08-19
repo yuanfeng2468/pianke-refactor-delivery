@@ -1,0 +1,13 @@
+[
+  {
+    "IndexName": "invite_logs_inviter_created_at",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "inviter_id", "Direction": "1", "Type": "varchar" },
+        { "Name": "created_at", "Direction": "-1", "Type": "long" }
+      ],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  }
+]

@@ -1,0 +1,21 @@
+[
+  {
+    "IndexName": "invite_attempts_user_created_at",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "user_id", "Direction": "1", "Type": "varchar" },
+        { "Name": "created_at", "Direction": "-1", "Type": "long" }
+      ],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  },
+  {
+    "IndexName": "invite_attempts_event_id",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [{ "Name": "event_id", "Direction": "1", "Type": "varchar" }],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  }
+]

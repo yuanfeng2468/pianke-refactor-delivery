@@ -1,0 +1,34 @@
+[
+  {
+    "IndexName": "user_invite_code_unique",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [{ "Name": "invite_code", "Direction": "1", "Type": "varchar" }],
+      "MgoIsUnique": true
+    },
+    "MgoIsSparse": false
+  },
+  {
+    "IndexName": "user_updated_at",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [{ "Name": "updated_at", "Direction": "-1", "Type": "long" }],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  },
+  {
+    "IndexName": "user_device_id",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [{ "Name": "device_id", "Direction": "1", "Type": "varchar" }],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  },
+  {
+    "IndexName": "user_invited_by",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [{ "Name": "invited_by", "Direction": "1", "Type": "varchar" }],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  }
+]

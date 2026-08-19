@@ -1,0 +1,21 @@
+{
+  "bsonType": "object",
+  "required": ["_id", "event_id", "user_id", "adpid", "scene", "event_type", "status", "created_at"],
+  "permission": { "read": false, "create": false, "update": false, "delete": false },
+  "properties": {
+    "_id": { "description": "事件日志唯一 ID", "bsonType": "string" },
+    "event_id": { "description": "客户端/服务端事件幂等标识", "bsonType": "string" },
+    "user_id": { "description": "用户 ID", "bsonType": "string" },
+    "adpid": { "description": "广告位 ID", "bsonType": "string" },
+    "scene": { "description": "广告业务场景", "bsonType": "string", "enum": ["relax", "coin_page_quick_earn", "coin_page_feed", "interstitial_popup", "interstitial_exit_coin", "interstitial_before_background"] },
+    "event_type": { "description": "标准广告事件", "bsonType": "string", "enum": ["request", "fill", "start", "show", "click", "complete", "close", "error", "middle_exit", "reward_success", "reward_fail", "reward_duplicate", "exposure_start", "exposure_rewarded", "exposure_expired", "skipped", "reward", "load_start", "load_success", "load_failed", "show_requested", "shown", "closed", "callback_received", "callback_verified", "reward_granted"] },
+    "status": { "description": "事件处理状态", "bsonType": "string", "enum": ["success", "failed", "timeout", "skipped"] },
+    "trans_id": { "description": "关联业务事务 ID", "bsonType": "string" },
+    "reward_amount": { "description": "本事件关联金币数，实际资产以奖励凭证为准", "bsonType": "int", "minimum": 0 },
+    "reward_time": { "description": "本事件关联放松秒数", "bsonType": "int", "minimum": 0 },
+    "meta": { "description": "已脱敏的扩展信息", "bsonType": "object" },
+    "ip_address": { "description": "请求 IP", "bsonType": "string" },
+    "device_id": { "description": "设备标识", "bsonType": "string" },
+    "created_at": { "description": "服务端时间戳（毫秒）", "bsonType": "long" }
+  }
+}

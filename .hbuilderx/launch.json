@@ -1,0 +1,23 @@
+{
+    "version" : "1.0",
+    "configurations" : [
+        {
+            "customPlaygroundType" : "local",
+            "playground" : "custom",
+            "type" : "uni-app:app-android"
+        },
+        {
+            "app" : {
+                "launchtype" : "remote"
+            },
+            "default" : {
+                "launchtype" : "local"
+            },
+            "h5" : {
+                "launchtype" : "local"
+            },
+            "provider" : "alipay",
+            "type" : "uniCloud"
+        }
+    ]
+}

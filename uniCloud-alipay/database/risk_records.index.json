@@ -1,0 +1,50 @@
+[
+  {
+    "IndexName": "uid_action_created_at",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "uid",
+          "Direction": "1",
+          "Type": "varchar"
+        },
+        {
+          "Name": "action",
+          "Direction": "1",
+          "Type": "long"
+        },
+        {
+          "Name": "created_at",
+          "Direction": "-1",
+          "Type": "long"
+        }
+      ],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  },
+  {
+    "IndexName": "ip_action_created_at",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "ip",
+          "Direction": "1",
+          "Type": "long"
+        },
+        {
+          "Name": "action",
+          "Direction": "1",
+          "Type": "long"
+        },
+        {
+          "Name": "created_at",
+          "Direction": "-1",
+          "Type": "long"
+        }
+      ],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  }
+]

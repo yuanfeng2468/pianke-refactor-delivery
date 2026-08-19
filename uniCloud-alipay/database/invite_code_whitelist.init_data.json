@@ -1,0 +1,13 @@
+[
+  {
+    "_id": "invite_beta2024",
+    "code": "BETA2024",
+    "status": "active",
+    "max_uses": -1,
+    "current_uses": 0,
+    "created_by": "system_init",
+    "created_at": 0,
+    "reward_gold": 100,
+    "description": "兼容旧版本测试邀请码"
+  }
+]

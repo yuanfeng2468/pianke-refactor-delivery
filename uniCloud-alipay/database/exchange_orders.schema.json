@@ -1,0 +1,67 @@
+{
+  "bsonType": "object",
+  "required": [
+    "_id",
+    "order_id",
+    "uid",
+    "goods_id",
+    "gold_cost",
+    "status",
+    "created_at"
+  ],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "description": "内部 ID",
+      "bsonType": "string"
+    },
+    "order_id": {
+      "description": "兑换订单号",
+      "bsonType": "string"
+    },
+    "uid": {
+      "description": "用户 ID",
+      "bsonType": "string"
+    },
+    "goods_id": {
+      "description": "商品 ID",
+      "bsonType": "string"
+    },
+    "gold_cost": {
+      "description": "消耗金币",
+      "bsonType": "int",
+      "minimum": 0
+    },
+    "status": {
+      "bsonType": "string",
+      "enum": [
+        "created",
+        "paid",
+        "processing",
+        "success",
+        "failed"
+      ]
+    },
+    "fail_reason": {
+      "description": "失败原因",
+      "bsonType": "string"
+    },
+    "created_at": {
+      "description": "创建时间",
+      "bsonType": "long"
+    },
+    "paid_at": {
+      "description": "支付时间",
+      "bsonType": "long"
+    },
+    "success_at": {
+      "description": "成功时间",
+      "bsonType": "long"
+    }
+  }
+}

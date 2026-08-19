@@ -1,0 +1,165 @@
+{
+  "bsonType": "object",
+  "required": [
+    "_id"
+  ],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "description": "服务端生成的稳定用户标识，不接受客户端自定义",
+      "bsonType": "string"
+    },
+    "device_id": {
+      "description": "首次初始化时绑定的设备安装标识",
+      "bsonType": "string"
+    },
+    "gold_balance": {
+      "description": "金币余额；仅云函数可修改",
+      "bsonType": "int",
+      "minimum": 0
+    },
+    "relaxation_time": {
+      "description": "剩余放松时长，单位秒；仅云函数可修改",
+      "bsonType": "int",
+      "minimum": 0
+    },
+    "relaxation_started_at": {
+      "description": "当前放松时长开始/最近一次服务端校准时间戳",
+      "bsonType": "long"
+    },
+    "relaxation_expire_at": {
+      "description": "当前放松时长服务端过期时间戳",
+      "bsonType": "long"
+    },
+    "last_relax_sync_at": {
+      "description": "服务端最后一次放松统计同步时间戳",
+      "bsonType": "long"
+    },
+    "total_ad_views": {
+      "description": "累计完成的激励视频次数",
+      "bsonType": "int",
+      "minimum": 0
+    },
+    "daily_ad_count": {
+      "description": "今日完成激励视频次数",
+      "bsonType": "int",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "daily_ad_date": {
+      "description": "激励视频日切换标识 YYYY-MM-DD",
+      "bsonType": "string"
+    },
+    "daily_feed_count": {
+      "description": "今日信息流曝光奖励次数",
+      "bsonType": "int",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "daily_feed_date": {
+      "description": "信息流奖励日切换标识 YYYY-MM-DD",
+      "bsonType": "string"
+    },
+    "invite_code": {
+      "description": "本人邀请码",
+      "bsonType": "string"
+    },
+    "invited_by": {
+      "description": "绑定的邀请码或邀请人标识",
+      "bsonType": "string"
+    },
+    "invite_bind_used": {
+      "description": "是否已完成邀请码绑定",
+      "bsonType": "bool"
+    },
+    "invite_reward_claimed": {
+      "description": "是否已发放邀请双方奖励",
+      "bsonType": "bool"
+    },
+    "activation_status": {
+      "description": "账户激活状态",
+      "bsonType": "string",
+      "enum": [
+        "pending",
+        "activated"
+      ]
+    },
+    "continuous_checkin": {
+      "description": "连续签到天数",
+      "bsonType": "int",
+      "minimum": 0
+    },
+    "last_checkin_date": {
+      "description": "最后签到日期 YYYY-MM-DD",
+      "bsonType": "string"
+    },
+    "total_relaxation_seconds": {
+      "description": "累计放松时长（秒）",
+      "bsonType": "long",
+      "minimum": 0
+    },
+    "coupon_15min_today": {
+      "description": "今日已兑换15分钟券次数",
+      "bsonType": "int",
+      "minimum": 0
+    },
+    "coupon_60min_today": {
+      "description": "今日已兑换60分钟券次数",
+      "bsonType": "int",
+      "minimum": 0
+    },
+    "coupon_date": {
+      "description": "兑换日切换标识 YYYY-MM-DD",
+      "bsonType": "string"
+    },
+    "created_at": {
+      "description": "创建时间戳（毫秒）",
+      "bsonType": "long"
+    },
+    "updated_at": {
+      "description": "更新时间戳（毫秒）",
+      "bsonType": "long"
+    },
+    "last_invite_code_check_at": {
+      "description": "最后一次邀请码校验时间戳",
+      "bsonType": "long"
+    },
+    "last_reward_at": {
+      "description": "最后一次奖励时间戳",
+      "bsonType": "long"
+    },
+    "last_sync_at": {
+      "description": "最后一次服务端同步时间戳",
+      "bsonType": "long"
+    },
+    "last_bootstrap_ip": {
+      "description": "最近一次初始化请求来源 IP，仅用于安全审计",
+      "bsonType": "string"
+    },
+    "last_bootstrap_at": {
+      "description": "最近一次初始化请求时间戳，仅用于安全审计",
+      "bsonType": "long"
+    },
+    "vip_expire_at": {
+      "description": "兼容历史 VIP 到期时间",
+      "bsonType": "long"
+    },
+    "avatar_url": {
+      "description": "头像地址",
+      "bsonType": "string"
+    },
+    "props_owned": {
+      "description": "道具扩展字段",
+      "bsonType": "object"
+    },
+    "last_reward_order_at": {
+      "description": "最近一次创建激励视频奖励订单时间戳，用于60秒服务端冷却",
+      "bsonType": "long"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "bsonType": "object",
+  "required": ["_id", "text", "author", "mood", "created_at", "is_active"],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "description": "文案ID",
+      "bsonType": "string"
+    },
+    "text": {
+      "description": "金句正文",
+      "bsonType": "string",
+      "minLength": 1,
+      "maxLength": 300
+    },
+    "author": {
+      "description": "作者",
+      "bsonType": "string",
+      "maxLength": 80
+    },
+    "mood": {
+      "description": "情绪标签",
+      "bsonType": "string",
+      "maxLength": 40
+    },
+    "created_at": {
+      "description": "创建时间戳（毫秒）",
+      "bsonType": "long"
+    },
+    "is_active": {
+      "description": "是否启用",
+      "bsonType": "bool"
+    }
+  }
+}

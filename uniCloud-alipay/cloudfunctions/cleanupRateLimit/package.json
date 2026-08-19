@@ -1,0 +1,9 @@
+{
+  "name": "cleanupRateLimit",
+  "version": "3.0.0",
+  "description": "Clean up expired rate limit records",
+  "main": "index.js",
+  "dependencies": {
+    "pianke-common": "file:../common/pianke-common"
+  }
+}

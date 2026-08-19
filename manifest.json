@@ -1,0 +1,83 @@
+{
+    "name" : "片刻",
+    "appid" : "__UNI__BD1A261",
+    "description" : "片刻 PianKe - 极简白噪音放松工具",
+    "versionName" : "3.0.0",
+    "versionCode" : 300,
+    "transformPx" : false,
+    "app-plus" : {
+        "usingComponents" : true,
+        "nvueStyleCompiler" : "uni-app",
+        "compilerVersion" : 3,
+        "splashscreen" : {
+            "alwaysShowBeforeRender" : true,
+            "waiting" : true,
+            "autoclose" : true,
+            "delay" : 0
+        },
+        "modules" : {
+            "Ad" : {
+                "description" : "广告"
+            },
+            "VideoPlayer" : {
+                "description" : "视频播放器"
+            },
+            "Audio" : {
+                "description" : "音频播放"
+            }
+        },
+        "distribute" : {
+            "android" : {
+                "permissions" : [
+                    "<uses-permission android:name=\"android.permission.INTERNET\"/>",
+                    "<uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\"/>"
+                ],
+                "minSdkVersion" : 21,
+                "targetSdkVersion" : 33
+            },
+            "sdkConfigs" : {
+                "ad" : {
+                    "appid" : "1790921229",
+                    "gdt" : {
+                        "enabled" : true
+                    },
+                    "csj" : {
+                        "enabled" : true
+                    },
+                    "ks" : {},
+                    "sigmob" : {},
+                    "hw" : {},
+                    "bd" : {},
+                    "zy" : {},
+                    "bz" : {},
+                    "fl" : {},
+                    "yt" : {},
+                    "jt" : {},
+                    "wa" : {}
+                }
+            },
+            "icons" : {
+                "android" : {
+                    "hdpi" : "static/logo/logo.png",
+                    "xhdpi" : "static/logo/logo.png",
+                    "xxhdpi" : "static/logo/logo.png",
+                    "xxxhdpi" : "static/logo/logo.png"
+                }
+            }
+        }
+    },
+    "uniStatistics" : {
+        "enable" : true
+    },
+    "uniCloud" : {
+        "alipay" : {
+            "spaceId" : "env-00jy6ozy1390",
+            "provider" : "alipay"
+        }
+    },
+    "uni-ad" : {
+        "enabled" : true
+    },
+    "vueVersion" : "3",
+    "locale" : "zh-Hans"
+}

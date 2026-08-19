@@ -1,0 +1,20 @@
+[
+  {
+    "_id": "feed_ad_default_01",
+    "title": "片刻精选放松陪伴",
+    "description": "沉浸式白噪音与放松时刻，治愈您的每一天",
+    "adpid": "1971169255",
+    "slot_id": "slot_feed_01",
+    "media_type": "image",
+    "image_url": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80",
+    "landing_url": "https://pianke.im",
+    "width": 1200,
+    "height": 675,
+    "aspect_ratio": 1.7778,
+    "source": "PianKe Official",
+    "is_active": true,
+    "sort_order": 1,
+    "created_at": 1718000000000,
+    "updated_at": 1718000000000
+  }
+]

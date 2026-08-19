@@ -1,0 +1,61 @@
+{
+  "bsonType": "object",
+  "required": [
+    "_id",
+    "uid",
+    "before_seconds",
+    "delta_seconds",
+    "after_seconds",
+    "business_type",
+    "idempotency_key",
+    "created_at"
+  ],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "bsonType": "string"
+    },
+    "uid": {
+      "bsonType": "string"
+    },
+    "before_seconds": {
+      "bsonType": "long",
+      "minimum": 0
+    },
+    "delta_seconds": {
+      "bsonType": "long"
+    },
+    "after_seconds": {
+      "bsonType": "long",
+      "minimum": 0
+    },
+    "business_type": {
+      "bsonType": "string",
+      "enum": [
+        "ad_reward",
+        "feed_reward",
+        "exchange",
+        "relax_consume",
+        "admin",
+        "migration"
+      ]
+    },
+    "order_id": {
+      "bsonType": "string"
+    },
+    "idempotency_key": {
+      "bsonType": "string"
+    },
+    "remark": {
+      "bsonType": "string"
+    },
+    "created_at": {
+      "bsonType": "long"
+    }
+  }
+}

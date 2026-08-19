@@ -1,0 +1,9 @@
+{
+  "name": "uni-ad-callback",
+  "version": "1.0.0",
+  "description": "UniAD 激励视频服务器回调处理云对象",
+  "main": "index.obj.js",
+  "dependencies": {
+    "pianke-common": "file:../common/pianke-common"
+  }
+}

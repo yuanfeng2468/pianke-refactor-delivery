@@ -1,0 +1,14 @@
+[
+  {
+    "IndexName": "feed_ads_active_sort_created",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "is_active", "Direction": "1", "Type": "bool" },
+        { "Name": "sort_order", "Direction": "1", "Type": "int" },
+        { "Name": "created_at", "Direction": "-1", "Type": "long" }
+      ],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  }
+]
