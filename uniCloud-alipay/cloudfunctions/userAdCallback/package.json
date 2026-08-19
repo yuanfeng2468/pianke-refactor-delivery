@@ -1,0 +1,9 @@
+{
+  "name": "userAdCallback",
+  "version": "1.0.0",
+  "description": "uni-ad 激励视频业务回调入口",
+  "main": "index.js",
+  "dependencies": {
+    "pianke-common": "file:../common/pianke-common"
+  }
+}

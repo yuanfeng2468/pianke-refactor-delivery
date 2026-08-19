@@ -386,7 +386,6 @@ async function handleQuickEarn() {
       scene: 'coin_page_quick_earn',
       onRewarded: (_reward, meta = {}) => {
         if (!meta.late) return
-        uni.showToast({ title: '奖励已到账', icon: 'success' })
         void userStore.getUserInfo({ force: true })
       }
     })

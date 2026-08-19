@@ -9,7 +9,8 @@
     "dev:app": "node scripts/dev-uni.cjs app",
     "build": "node scripts/build-uni.cjs h5",
     "build:h5": "node scripts/build-uni.cjs h5",
-    "build:app": "node scripts/build-uni.cjs app"
+    "build:app": "node scripts/build-uni.cjs app",
+    "test:reward-closure": "node scripts/reward-closure-test.js"
   },
   "dependencies": {
     "@dcloudio/uni-app": "3.0.0-5010520260709002",

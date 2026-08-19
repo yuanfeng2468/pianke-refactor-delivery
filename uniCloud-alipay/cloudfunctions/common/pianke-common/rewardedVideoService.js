@@ -34,9 +34,9 @@ async function addSecurityAuditLog(data) {
 }
 
 async function processRewardedVideoCallback(params = {}) {
-  const adpid = String(params.adpid || '').trim()
-  const transId = String(params.trans_id || '').trim()
-  const uid = String(params.user_id || params.userId || '').trim()
+  const adpid = String(params.adpid || params.adp_id || '').trim()
+  const transId = String(params.trans_id || params.transId || params.transaction_id || '').trim()
+  const uid = String(params.user_id || params.userId || params.uid || '').trim()
   let extra = params.extra
   for (let i = 0; i < 3 && typeof extra === 'string'; i += 1) {
     try { extra = JSON.parse(extra) } catch (_) { break }
@@ -112,7 +112,12 @@ async function processRewardedVideoCallback(params = {}) {
     result = { status: 'rewarded', trans_id: transId, order_id: orderId, gold: rewardGold, time: rewardTime, daily_count: dailyCount }
   }, { retries: 2 })
 
-  await addAdLog({ event_id: `callback:${transId}`, user_id: uid, adpid, scene, event_type: result.status === 'rewarded' ? 'reward_success' : AD_EVENTS.REWARD_DUPLICATE, status: result.status === 'pending_review' ? 'pending' : 'success', trans_id: transId, reward_amount: result.gold || 0, reward_time: result.time || 0, created_at: timestamp })
+  try {
+    await addAdLog({ event_id: `callback:${transId}`, user_id: uid, adpid, scene, event_type: result.status === 'rewarded' ? 'reward_success' : AD_EVENTS.REWARD_DUPLICATE, status: result.status === 'pending_review' ? 'pending' : 'success', trans_id: transId, reward_amount: result.gold || 0, reward_time: result.time || 0, created_at: timestamp })
+  } catch (error) {
+    // 奖励事务已经提交时，日志失败不得让 uni-ad 误判为未处理并无限重试回调。
+    console.error('[rewardedVideoService] post-grant ad log failed', { user_id: uid, trace_id: transId, error_stack: String(error?.stack || error?.message || error) })
+  }
   return result
 }
 

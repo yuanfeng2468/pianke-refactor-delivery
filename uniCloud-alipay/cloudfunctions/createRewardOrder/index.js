@@ -3,7 +3,7 @@ const crypto = require('crypto')
 const { 
   AD_CONFIG, ERROR_CODES, PiankeError, findUser, 
   checkAndResetDaily, getClientInfo, getIdempotencyKey, 
-  getBatchConfigs, getOperationNumber, getOperationString, 
+  getBatchConfigs, getOperationNumber, getOperationString, getBusinessDate,
   now, requireAuth, runTransaction, safeInt, stableId, 
   assertScene, normalizeRewardContext, addSecurityAuditLog 
 } = require('pianke-common')
@@ -68,7 +68,11 @@ exports.main = async (event = {}, context = {}) => {
       if (!user) throw new PiankeError('用户不存在', ERROR_CODES.USER_NOT_FOUND)
 
       const reset = checkAndResetDaily(user, timestamp)
-      const currentCount = reset.changed ? 0 : safeInt(user.daily_ad_count)
+      const businessDate = getBusinessDate(timestamp)
+      const dailyStatId = stableId('daily_stats', `${authUid}:${businessDate}`)
+      const dailyStatResult = await transaction.collection('user_daily_stats').doc(dailyStatId).get()
+      const dailyStat = dailyStatResult.data?.[0] || dailyStatResult.data || null
+      const currentCount = safeInt(dailyStat?.ad_count)
       if (currentCount >= daily_limit) throw new PiankeError('今日广告次数已达上限', ERROR_CODES.DAILY_LIMIT_REACHED)
 
       // 冷却锚点写入 user 同一事务，避免两个并发请求同时看到“无最近订单”而双穿。

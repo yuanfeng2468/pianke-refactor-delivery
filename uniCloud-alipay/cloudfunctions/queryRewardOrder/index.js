@@ -11,8 +11,8 @@ exports.main = async (event = {}, context = {}) => {
     if (order_id) {
       query.order_id = order_id
     } else if (status === 'pending_recovery') {
-      // 仅恢复十分钟内仍处于 created 的订单；pending_recovery 是查询意图，不是订单状态。
-      query.status = 'created'
+      // pending_recovery 是查询意图；必须覆盖订单已被客户端上报或进入服务端核验后的未终结状态。
+      query.status = uniCloud.database().command.in(['created', 'client_completed', 'verifying', 'verified', 'pending_review'])
       query.created_at = uniCloud.database().command.gt(now() - 10 * 60 * 1000)
     } else {
       return { code: ERROR_CODES.INVALID_PARAM, message: '缺少查询参数', data: null }

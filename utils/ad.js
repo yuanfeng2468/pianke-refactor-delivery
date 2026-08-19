@@ -68,7 +68,8 @@ export async function playRewardedAd({ store, scene, rewardContext = {}, onRewar
     
     const orderId = orderRes.data.order_id
     
-    // 实例化广告并配置回调
+    // 实例化广告并配置回调；没有预加载实例时必须主动 load，否则首次点击会永久等待。
+    const wasPreloaded = Boolean(_rewardedAd)
     const adInstance = _rewardedAd || uni.createRewardedVideoAd({ adpid: String(adpid) })
     adInstance.urlCallback = {
       userId: String(store.user._id),
@@ -76,6 +77,7 @@ export async function playRewardedAd({ store, scene, rewardContext = {}, onRewar
     }
 
     return new Promise((resolve, reject) => {
+      let settled = false
       const cleanup = () => {
         adInstance.offLoad()
         adInstance.offError()
@@ -85,58 +87,108 @@ export async function playRewardedAd({ store, scene, rewardContext = {}, onRewar
         preloadRewardedAd(store)
       }
 
-      adInstance.onLoad(() => { hideLoading(); adInstance.show() })
-      adInstance.onError((err) => { cleanup(); reject(new Error(err.errMsg || '广告加载失败')) })
+      const showAd = () => {
+        hideLoading()
+        adInstance.show().catch((error) => {
+          cleanup()
+          if (!settled) { settled = true; reject(error) }
+        })
+      }
+      adInstance.onLoad(() => { _isLoading = false; showAd() })
+      adInstance.onError((err) => {
+        if (settled) return
+        settled = true
+        cleanup()
+        reject(new Error(err.errMsg || '广告加载失败'))
+      })
       adInstance.onClose(async (res) => {
-        if (res?.isEnded) {
+        if (settled) return
+        settled = true
+        if (!res?.isEnded) {
+          try {
+            await store.invoke('cancelRewardOrder', { order_id: orderId, reason: 'middle_exit' })
+          } catch (error) {
+            console.warn('[ad] cancel order deferred', { user_id: store.user?._id || '', trace_id: orderId, error_stack: String(error?.stack || error?.message || error) })
+          }
+          cleanup()
+          reject(new Error('完整观看视频才能获得奖励'))
+          return
+        }
+
+        try {
           try {
             await store.invoke('reportAdCompleted', { order_id: orderId })
           } catch (error) {
             if ([401, 1403].includes(Number(error?.code))) {
-              try { await store.ensureSessionReady() } catch (error) { console.warn('[ad] session recovery failed', { user_id: store.user?._id || '', trace_id: '', error_stack: String(error?.stack || error?.message || error) }) }
+              try {
+                await store.ensureSessionReady()
+                await store.invoke('reportAdCompleted', { order_id: orderId })
+              } catch (retryError) {
+                console.warn('[ad] completion report deferred', { user_id: store.user?._id || '', trace_id: orderId, error_stack: String(retryError?.stack || retryError?.message || retryError) })
+              }
+            } else {
+              console.warn('[ad] completion report deferred', { user_id: store.user?._id || '', trace_id: orderId, error_stack: String(error?.stack || error?.message || error) })
             }
           }
 
-          // 阶梯式轮询：500/1000/1500/2000/2000ms，共 7 秒；超时进入延迟到账态
+          // 阶梯式轮询：服务端回调成功后才确认到账；超时进入延迟到账态。
           let rewardData = null
           const pollIntervals = [300, 500, 800, 1200, 1800, 2500]
-          for (let ms of pollIntervals) {
+          for (const ms of pollIntervals) {
             await wait(ms)
             let query = null
             try {
               query = await store.invoke('queryRewardOrder', { order_id: orderId })
             } catch (error) {
-              console.warn('[ad] reward order query failed', { user_id: store.user?._id || '', trace_id: '', error_stack: String(error?.stack || error?.message || error) })
-              query = null
+              console.warn('[ad] reward order query failed', { user_id: store.user?._id || '', trace_id: orderId, error_stack: String(error?.stack || error?.message || error) })
             }
-            if (['rewarded'].includes(query?.data?.status)) {
-              const refreshed = await store.getUserInfo({ force: true })
-              rewardData = refreshed?.data || { user: store.user }
+            if (query?.data?.status === 'rewarded') {
+              try {
+                const refreshed = await store.getUserInfo({ force: true })
+                rewardData = refreshed?.data || { user: store.user }
+              } catch (error) {
+                console.warn('[ad] rewarded asset refresh deferred', { user_id: store.user?._id || '', trace_id: orderId, error_stack: String(error?.stack || error?.message || error) })
+                rewardData = { user: store.user, pending: true }
+              }
               break
+            }
+            if (query?.data?.status === 'failed') {
+              throw new Error(query?.data?.fail_reason || '广告订单已失败，奖励未发放')
             }
           }
 
           if (!rewardData) {
-            // 超时未即时同步：强制拉取资产，但明确标记为“延迟到账”，禁止前端猜测已到账。
-            const refreshed = await store.getUserInfo({ force: true })
+            // 超时未即时同步：不猜测已到账，提示用户进入恢复流程。
+            let refreshed = null
+            try { refreshed = await store.getUserInfo({ force: true }) } catch (error) {
+              console.warn('[ad] pending asset refresh deferred', { user_id: store.user?._id || '', trace_id: orderId, error_stack: String(error?.stack || error?.message || error) })
+            }
             rewardData = refreshed?.data || { user: store.user }
             rewardData.pending = true
           }
 
-          if (onRewarded) onRewarded(rewardData, { late: Boolean(rewardData.pending), meta: { late: Boolean(rewardData.pending), order_id: orderId } })
+          try {
+            if (onRewarded) await onRewarded(rewardData, { late: Boolean(rewardData.pending), meta: { late: Boolean(rewardData.pending), order_id: orderId } })
+          } catch (error) {
+            console.warn('[ad] reward UI callback failed', { user_id: store.user?._id || '', trace_id: orderId, error_stack: String(error?.stack || error?.message || error) })
+          }
           cleanup()
           resolve(rewardData)
-        } else {
-          await store.invoke('cancelRewardOrder', { order_id: orderId, reason: 'middle_exit' })
+        } catch (error) {
           cleanup()
-          reject(new Error('完整观看视频才能获得奖励'))
+          reject(error)
         }
       })
 
-      if (!_isLoading && _rewardedAd) {
-        hideLoading()
-        adInstance.show().catch(() => {
-          adInstance.load().catch(e => { cleanup(); reject(e) })
+      if (wasPreloaded) {
+        if (!_isLoading) showAd()
+      } else {
+        _isLoading = true
+        adInstance.load().catch((error) => {
+          if (settled) return
+          settled = true
+          cleanup()
+          reject(error)
         })
       }
     })

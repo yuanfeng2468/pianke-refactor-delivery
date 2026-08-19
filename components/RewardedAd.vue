@@ -82,9 +82,8 @@ async function handleClick() {
         if (!meta.late) return
         flashAmber.value = true
         setTimeout(() => { flashAmber.value = false }, 1200)
-        try { uni.vibrateShort({ type: 'success' }) } catch (error) { console.warn('[RewardedAd] vibration failed', { user_id: '', trace_id: '', error_stack: String(error?.stack || error?.message || error) }) }
+        try { uni.vibrateShort({ type: 'light' }) } catch (error) { console.warn('[RewardedAd] vibration failed', { user_id: '', trace_id: '', error_stack: String(error?.stack || error?.message || error) }) }
         void userStore.getUserInfo({ force: true })
-        uni.showToast({ title: '奖励已到账', icon: 'success' })
       }
     })
 
