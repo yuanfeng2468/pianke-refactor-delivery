@@ -5,7 +5,9 @@ const constants = require('./constants')
 const utils = require('./utils')
 const orderState = require('./orderState')
 const walletService = require('./walletService')
-const { addRelaxationLedger } = require('./relaxationService')
+const relaxationService = require('./relaxationService')
+const { addRelaxationLedger } = relaxationService
+const { incrementDailyStat } = require('./dailyStats')
 const { processRewardedVideoCallback } = require('./rewardedVideoService')
 const { grantInviteReward } = require('./invite')
 const { buildAssetDTO } = require('./assetDto')
@@ -17,7 +19,7 @@ const {
 } = constants
 
 const {
-  now, safeInt, stableId, hash, getTodayString, getYesterdayString, findUser
+  now, safeInt, stableId, hash, BUSINESS_TIME_ZONE, getBusinessDate, getTodayString, getYesterdayString, isTransientTransactionError, findUser
 } = utils
 
 const { addLedger } = walletService
@@ -28,7 +30,7 @@ function safeAdminSecretCompare(expected, actual) {
   return a.length === b.length && crypto.timingSafeEqual(a, b)
 }
 const { transitions, assertTransition, canTransition } = orderState
-const { SCENE_POLICIES, getScenePolicy, normalizeRewardContext, assertScene } = require('./adPolicy')
+const { SCENE_POLICIES, getScenePolicy, resolveScenePolicy, normalizeRewardContext, assertScene } = require('./adPolicy')
 
 function getIdempotencyKey(event = {}) { 
   return String(event.idempotency_key || event.trans_id || event.request_id || '').trim() 
@@ -154,7 +156,7 @@ async function runTransaction(callback, options = {}) {
       try { await transaction.rollback() } catch (rollbackError) {
         console.error('[pianke-common] transaction rollback failed', { user_id: '', trace_id: '', error_stack: String(rollbackError.stack || rollbackError.message || rollbackError) })
       }
-      if (attempt >= retries) throw error 
+      if (!isTransientTransactionError(error) || attempt >= retries) throw error
     }
   }
   throw lastError
@@ -175,6 +177,14 @@ async function getOperationConfig(key, fallback = null) {
     _configCache.set(key, { val, timestamp: nowTime })
     return val
   } catch (_) { return fallback }
+}
+
+async function getRequiredOperationConfig(key) {
+  const value = await getOperationConfig(key, undefined)
+  if (value === undefined || value === null) {
+    throw new PiankeError(`关键运营配置缺失:${key}`, ERROR_CODES.CONFIG_INVALID)
+  }
+  return value
 }
 
 async function getBatchConfigs(keys, fallbacks = {}) {
@@ -354,12 +364,12 @@ async function latestAssetPayload(uid, timestamp = now(), dbLike = null) {
 module.exports = {
   RELEASE, ERROR_CODES, AD_CONFIG, INVITE_CONFIG, CHECKIN_CONFIG, COUPON_CONFIG,
   AD_EVENT_TYPES, AD_EVENTS, AD_SCENES, PiankeError,
-  now, safeInt, stableId, hash, getTodayString, getYesterdayString, findUser,
-  addLedger, addRelaxationLedger, processRewardedVideoCallback, grantInviteReward, transitions, assertTransition, canTransition,
-  SCENE_POLICIES, getScenePolicy, normalizeRewardContext, assertScene,
+  now, safeInt, stableId, hash, BUSINESS_TIME_ZONE, getBusinessDate, getTodayString, getYesterdayString, isTransientTransactionError, findUser,
+  addLedger, addRelaxationLedger, incrementDailyStat, processRewardedVideoCallback, grantInviteReward, transitions, assertTransition, canTransition,
+  SCENE_POLICIES, getScenePolicy, resolveScenePolicy, normalizeRewardContext, assertScene,
   getIdempotencyKey, assertRequestedUid, requestId, requestToken, safeAdminSecretCompare,
   clientDeviceId, clientIp, createUserInTransaction, createUserSession, requireAuth,
-  getClientInfo, runTransaction, getOperationConfig, getOperationNumber,
+  getClientInfo, runTransaction, getOperationConfig, getRequiredOperationConfig, getOperationNumber,
   getOperationString, getBatchConfigs, checkAndResetDaily, ensureUserInTransaction, checkRateLimit, evaluateInterstitialFrequency,
   relaxationGrantPatch, writeLog, addGoldLog, addInviteAttemptLog, addRewardGrant, addAdLog,
   addSecurityAuditLog, buildAssetPayload, latestAssetPayload, ok, fail, assert

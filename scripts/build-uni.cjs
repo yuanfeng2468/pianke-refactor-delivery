@@ -4,8 +4,7 @@ const { spawnSync } = require('node:child_process')
 const path = require('node:path')
 
 const target = process.argv[2] || 'h5'
-const args = ['build']
-if (target === 'app') args.push('-p', 'app')
+const args = ['build', '-p', target]
 if (!['h5', 'app'].includes(target)) {
   console.error(`Unsupported build target: ${target}`)
   process.exit(2)

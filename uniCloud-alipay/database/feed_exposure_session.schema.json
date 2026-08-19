@@ -10,6 +10,8 @@
     "expires_at": { "description": "曝光会话过期时间戳", "bsonType": "long" },
     "user_id": { "description": "用户 ID", "bsonType": "string" },
     "adpid": { "description": "信息流广告位", "bsonType": "string" },
+    "business_date": { "description": "Asia/Shanghai 业务日", "bsonType": "string" },
+    "page": { "description": "信息流分页页码", "bsonType": "int", "minimum": 1 },
     "scene": { "description": "信息流场景", "bsonType": "string", "enum": ["coin_page_feed"] },
     "status": { "description": "issued/active/closed/rewarded/expired", "bsonType": "string", "enum": ["issued", "active", "closed", "rewarded", "expired"] },
     "started_at": { "description": "服务端曝光开始时间戳", "bsonType": "long" },

@@ -1,9 +1,9 @@
 'use strict'
 const { 
   requireAuth, assertRequestedUid, ERROR_CODES, PiankeError, 
-  getOperationConfig, getOperationNumber, findUser, 
+  getOperationConfig, getRequiredOperationConfig, getOperationNumber, findUser, 
   checkAndResetDaily, runTransaction, stableId, getIdempotencyKey, 
-  safeInt, now, buildAssetPayload, addLedger, addRelaxationLedger, getScenePolicy, addRewardGrant
+  safeInt, now, buildAssetPayload, addLedger, addRelaxationLedger, resolveScenePolicy, addRewardGrant
 } = require('pianke-common')
 
 exports.main = async (event = {}, context = {}) => {
@@ -22,7 +22,8 @@ exports.main = async (event = {}, context = {}) => {
     const auth = await requireAuth(event, context)
     const uid = assertRequestedUid(requestedUid, auth.uid)
     
-    const scenePolicy = getScenePolicy(scene) || { fixed_gold: 10, fixed_time: 60 }
+    const feedRewardTime = await getRequiredOperationConfig('feed_exposure_reward_time')
+    const scenePolicy = resolveScenePolicy(scene, { feed_exposure_reward_time: feedRewardTime })
     const minMs = Math.max(1000, getOperationNumber(await getOperationConfig('feed_exposure_min_ms', 60000), 60000))
     const timestamp = now()
     const sessionKey = stableId('feed_session', sessionId)

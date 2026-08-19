@@ -1,0 +1,19 @@
+{
+  "indexes": [
+    {
+      "IndexName": "user_daily_stats_user_date_unique",
+      "MgoIndexKeys": [
+        {"Name": "user_id", "Direction": "1", "Type": "string"},
+        {"Name": "business_date", "Direction": "1", "Type": "string"}
+      ],
+      "Unique": true
+    },
+    {
+      "IndexName": "user_daily_stats_date_updated",
+      "MgoIndexKeys": [
+        {"Name": "business_date", "Direction": "-1", "Type": "string"},
+        {"Name": "updated_at", "Direction": "-1", "Type": "long"}
+      ]
+    }
+  ]
+}

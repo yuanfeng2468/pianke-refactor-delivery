@@ -1,5 +1,5 @@
 'use strict'
-const { ERROR_CODES, PiankeError, now, requireAuth, runTransaction } = require('pianke-common')
+const { ERROR_CODES, PiankeError, now, requireAuth, runTransaction, assertTransition } = require('pianke-common')
 
 exports.main = async (event = {}, context = {}) => {
   try {
@@ -10,13 +10,15 @@ exports.main = async (event = {}, context = {}) => {
       const result = await transaction.collection('reward_orders').where({ order_id, uid }).limit(1).get()
       const order = result.data?.[0]
       if (!order) throw new PiankeError('订单不存在', ERROR_CODES.ORDER_NOT_FOUND)
-      if (order.status === 'rewarded' || order.status === 'failed') return order
+      if (order.status === 'rewarded' || order.status === 'failed' || order.status === 'pending_review' || order.status === 'verified') return order
       const updated_at = now()
+      if (order.status !== 'client_completed') assertTransition('reward_orders', order.status, 'client_completed')
       await transaction.collection('reward_orders').doc(order._id).update({
-        client_completed_at: updated_at,
+        status: 'client_completed',
+        client_completed_at: order.client_completed_at || updated_at,
         updated_at
       })
-      return { ...order, client_completed_at: updated_at, updated_at }
+      return { ...order, status: 'client_completed', client_completed_at: order.client_completed_at || updated_at, updated_at }
     })
     return { code: ERROR_CODES.SUCCESS, message: '客户端观看完成已记录，等待广告服务端确认', data: { order_id, status: data.status } }
   } catch (error) {

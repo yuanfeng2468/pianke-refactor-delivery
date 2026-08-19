@@ -52,6 +52,18 @@
     "MgoIsSparse": false
   },
   {
+    "IndexName": "status_reconciliation_updated_at",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {"Name": "status", "Direction": "1", "Type": "varchar"},
+        {"Name": "reconciliation_status", "Direction": "1", "Type": "varchar"},
+        {"Name": "updated_at", "Direction": "-1", "Type": "long"}
+      ]
+    },
+    "MgoIsUnique": false,
+    "MgoIsSparse": false
+  },
+  {
     "IndexName": "uid_created_at",
     "MgoKeySchema": {
       "MgoIndexKeys": [

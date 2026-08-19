@@ -1,6 +1,6 @@
 {
   "bsonType": "object",
-  "required": ["_id", "config_key", "config_value", "updated_by", "updated_at"],
+  "required": ["_id", "config_key", "config_value", "config_version", "updated_by", "updated_at"],
   "permission": {
     "read": false,
     "create": false,
@@ -15,6 +15,11 @@
     "config_key": {
       "description": "配置键（唯一）",
       "bsonType": "string"
+    },
+    "config_version": {
+      "description": "单调递增的配置版本",
+      "bsonType": "int",
+      "minimum": 1
     },
     "config_value": {
       "description": "配置值（支持多种类型）",

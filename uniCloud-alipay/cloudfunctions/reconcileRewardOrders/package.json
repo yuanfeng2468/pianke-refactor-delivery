@@ -1,0 +1,7 @@
+{
+  "name": "reconcileRewardOrders",
+  "version": "1.0.0",
+  "description": "Operator-protected pending reward reconciliation",
+  "main": "index.js",
+  "dependencies": {}
+}

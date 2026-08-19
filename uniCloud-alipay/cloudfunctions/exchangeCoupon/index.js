@@ -3,7 +3,7 @@
 const {
   COUPON_CONFIG, ERROR_CODES, PiankeError, requireAuth, assertRequestedUid, findUser,
   checkAndResetDaily, getOperationConfig, runTransaction, addLedger, writeLog,
-  checkRateLimit, safeInt, now, getIdempotencyKey, buildAssetPayload,
+  checkRateLimit, safeInt, now, getBusinessDate, stableId, getIdempotencyKey, buildAssetPayload,
   latestAssetPayload, addRelaxationLedger
 } = require('pianke-common')
 
@@ -35,8 +35,11 @@ exports.main = async (event = {}, context = {}) => {
     const time = Math.max(0, safeInt(configured?.time || configured?.relax_seconds, coupon.relax_seconds))
     const dailyLimit = Math.max(0, safeInt(configured?.dailyLimit || configured?.daily_limit, coupon.daily_limit))
     const todayField = couponType === '15min' ? 'coupon_15min_today' : 'coupon_60min_today'
+    const dailyField = couponType === '15min' ? 'coupon_15min_count' : 'coupon_60min_count'
     const couponName = couponType === '15min' ? '15分钟放松卡' : '60分钟放松卡'
     const timestamp = now()
+    const businessDate = getBusinessDate(timestamp)
+    const dailyStatsId = stableId('daily_stats', `${uid}:${businessDate}`)
 
     const result = await runTransaction(async (transaction) => {
       const user = await findUser(transaction, uid)
@@ -45,9 +48,12 @@ exports.main = async (event = {}, context = {}) => {
       
       const reset = checkAndResetDaily(user, timestamp)
       const current = { ...user, ...reset.patch }
-      
-      // 4. 校验上限与余额
-      if (safeInt(current[todayField]) >= dailyLimit) throw new PiankeError(`今日${couponName}已达兑换上限`, ERROR_CODES.DAILY_LIMIT_REACHED)
+      const statsCollection = transaction.collection('user_daily_stats')
+      const statsResult = await statsCollection.doc(dailyStatsId).get()
+      const stats = statsResult.data?.[0] || statsResult.data || null
+      const currentDailyCount = safeInt(stats?.[dailyField])
+      // 4. 校验上限与余额；user_daily_stats 是跨设备、跨请求的唯一业务日来源。
+      if (currentDailyCount >= dailyLimit) throw new PiankeError(`今日${couponName}已达兑换上限`, ERROR_CODES.DAILY_LIMIT_REACHED)
       if (safeInt(current.gold_balance) < cost) throw new PiankeError('金币余额不足', ERROR_CODES.INSUFFICIENT_GOLD)
       
       // 5. 核心：通过 addLedger 统一扣除金币并记录流水 (addLedger 内部会更新 user.gold_balance)
@@ -71,12 +77,12 @@ exports.main = async (event = {}, context = {}) => {
         remark: `兑换${couponName}放松时长`
       })
 
-      // 6. 只更新非资产字段，避免覆盖并发中的 relaxation_time。
-      await transaction.collection('user').doc(uid).update({
-        ...reset.patch,
-        [todayField]: safeInt(current[todayField]) + 1,
-        updated_at: timestamp
-      })
+      // 6. 更新业务日统计，并同步旧字段供老客户端展示；资产仍由不可变账本维护。
+      if (!stats) {
+        await statsCollection.doc(dailyStatsId).set({ _id: dailyStatsId, user_id: uid, business_date: businessDate, ad_count: 0, feed_count: 0, interstitial_count: 0, coupon_15min_count: 0, coupon_60min_count: 0, checkin_completed: false, created_at: timestamp, updated_at: timestamp })
+      }
+      await statsCollection.doc(dailyStatsId).update({ [dailyField]: uniCloud.database().command.inc(1), updated_at: timestamp })
+      await transaction.collection('user').doc(uid).update({ ...reset.patch, [todayField]: currentDailyCount + 1, coupon_date: businessDate, updated_at: timestamp })
       
       // 7. 写入兑换记录
       await writeLog('exchange_record', { 

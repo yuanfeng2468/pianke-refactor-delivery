@@ -154,12 +154,26 @@ exports.main = async (event = {}, context = {}) => {
     await runTransaction(async (transaction) => {
       const collection = transaction.collection('operation_config')
       const existing = await collection.where({ config_key: configKey }).limit(1).get()
-      const payload = { config_key: configKey, config_value: configValue, updated_by: actor, updated_at: updatedAt }
+      const previous = existing.data?.[0] || null
+      const configVersion = Math.max(0, Number(previous?.config_version || 0)) + 1
+      const payload = { config_key: configKey, config_value: configValue, config_version: configVersion, updated_by: actor, updated_at: updatedAt }
       if (existing.data && existing.data.length) {
         await collection.doc(existing.data[0]._id).update(payload)
       } else {
         await collection.doc(stableId('config', configKey)).set({ _id: stableId('config', configKey), ...payload })
       }
+      await transaction.collection('operation_config_audit').doc(stableId('config_audit', `${configKey}:${configVersion}:${rid}`)).set({
+        _id: stableId('config_audit', `${configKey}:${configVersion}:${rid}`),
+        config_key: configKey,
+        config_version: configVersion,
+        old_value_hash: hash(JSON.stringify(previous?.config_value ?? null)),
+        new_value_hash: hash(JSON.stringify(configValue)),
+        operator: actor,
+        request_id: rid,
+        ip,
+        timestamp: updatedAt,
+        created_at: updatedAt
+      })
       await addSecurityAuditLog({
         db: transaction,
         event_id: `config_update:${rid}`,
@@ -176,7 +190,8 @@ exports.main = async (event = {}, context = {}) => {
       }, transaction)
     })
 
-    return { code: ERROR_CODES.SUCCESS, message: '配置已更新', data: { config_key: configKey, updated_by: actor, updated_at: updatedAt } }
+          return { code: ERROR_CODES.SUCCESS, message: '配置已更新', data: { config_key: configKey, config_version: configVersion, updated_by: actor, updated_at: updatedAt } }
+
   } catch (error) {
     await auditSafely({
       event_id: `admin_operation_failed:${rid}`,

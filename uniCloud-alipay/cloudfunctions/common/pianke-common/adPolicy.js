@@ -82,4 +82,14 @@ function assertScene(scene) {
   return policy
 }
 
-module.exports = { SCENE_POLICIES, getScenePolicy, normalizeRewardContext, assertScene }
+function resolveScenePolicy(scene, config = {}) {
+  const policy = assertScene(scene)
+  const resolved = { ...policy }
+  if (resolved.category === 'feed') {
+    const configured = Number(config.feed_exposure_reward_time?.value ?? config.feed_exposure_reward_time)
+    if (Number.isFinite(configured) && configured >= 1) resolved.fixed_time = Math.trunc(configured)
+  }
+  return Object.freeze(resolved)
+}
+
+module.exports = { SCENE_POLICIES, getScenePolicy, resolveScenePolicy, normalizeRewardContext, assertScene }

@@ -1,0 +1,17 @@
+{
+  "bsonType": "object",
+  "required": ["_id", "config_key", "config_version", "operator", "request_id", "timestamp", "created_at"],
+  "permission": {"read": false, "create": false, "update": false, "delete": false},
+  "properties": {
+    "_id": {"bsonType": "string"},
+    "config_key": {"bsonType": "string"},
+    "config_version": {"bsonType": "int", "minimum": 1},
+    "old_value_hash": {"bsonType": "string"},
+    "new_value_hash": {"bsonType": "string"},
+    "operator": {"bsonType": "string"},
+    "request_id": {"bsonType": "string"},
+    "ip": {"bsonType": "string"},
+    "timestamp": {"bsonType": "long"},
+    "created_at": {"bsonType": "long"}
+  }
+}

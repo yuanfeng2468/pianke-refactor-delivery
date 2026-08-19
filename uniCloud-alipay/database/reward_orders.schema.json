@@ -45,6 +45,10 @@
       "bsonType": "string",
       "enum": [
         "created",
+        "client_completed",
+        "verifying",
+        "verified",
+        "pending_review",
         "rewarded",
         "failed"
       ]
@@ -97,6 +101,27 @@
     "client_completed_at": {
       "description": "客户端完成观看上报时间，仅作遥测，不参与发奖判定",
       "bsonType": "long"
+    },
+    "verified_at": {
+      "description": "服务端广告回调验证通过时间",
+      "bsonType": "long"
+    },
+    "pending_review_at": {
+      "description": "进入人工或延迟对账队列的时间",
+      "bsonType": "long"
+    },
+    "reconciled_at": {
+      "description": "对账完成时间",
+      "bsonType": "long"
+    },
+    "reconciliation_status": {
+      "description": "奖励对账状态",
+      "bsonType": "string",
+      "enum": ["not_required", "pending", "matched", "mismatch", "resolved"]
+    },
+    "reconciliation_note": {
+      "description": "对账说明，不得包含令牌或敏感身份信息",
+      "bsonType": "string"
     }
   }
 }

@@ -1,7 +1,7 @@
 'use strict'
 const { 
   requireAuth, assertRequestedUid, ERROR_CODES, getBatchConfigs,
-  getOperationString, stableId, now, AD_CONFIG, safeInt, addAdLog, requestId, AD_EVENTS
+  getOperationString, stableId, now, getBusinessDate, checkRateLimit, AD_CONFIG, safeInt, addAdLog, requestId, AD_EVENTS
 } = require('pianke-common')
 
 function positiveInt(value, fallback, max) {
@@ -27,6 +27,7 @@ exports.main = async (event = {}, context = {}) => {
     ])
 
     const uid = assertRequestedUid(requestedUid, auth.uid)
+    await checkRateLimit(`feed:get:${uid}`, 20, 60)
     const feedEnabled = configs.ad_enabled_feed !== false && configs.ad_enabled_feed !== 'false'
     const configuredAdpid = getOperationString(configs.adpid_feed, AD_CONFIG.FEED_AD.ADPID).trim()
     
@@ -35,6 +36,7 @@ exports.main = async (event = {}, context = {}) => {
     }
 
     const timestamp = now()
+    const businessDate = getBusinessDate(timestamp)
 
     // 2. 查询广告列表
     const adResult = await db.collection('feed_ads')
@@ -47,7 +49,7 @@ exports.main = async (event = {}, context = {}) => {
     
     const rawAds = adResult.data || []
     const ads = rawAds.filter(ad => ad && ad._id).map((ad, index) => {
-      const sessionId = stableId('feed_sess', `${uid}:${ad._id}:${timestamp}:${index}`)
+      const sessionId = stableId('feed_sess', `${uid}:${ad._id}:${businessDate}:${page}:${index}`)
       const width = safeInt(ad.width, 0)
       const height = safeInt(ad.height, 0)
       const ratio = ad.aspect_ratio || (width > 0 && height > 0 ? width / height : 1.7778)
@@ -76,6 +78,12 @@ exports.main = async (event = {}, context = {}) => {
         const slotId = String(ad.slotId || '').trim()
         if (!slotId) throw new Error(`广告 ${ad.id} 缺少 slot_id`)
         try {
+          const existingResult = await sessionCollection.doc(sessionKey).get()
+          const existingSession = existingResult.data?.[0] || existingResult.data
+          if (existingSession && safeInt(existingSession.expires_at) > timestamp && ['issued', 'active'].includes(String(existingSession.status))) {
+            ad.sessionId = String(existingSession.session_id)
+            continue
+          }
           await sessionCollection.doc(sessionKey).set({
             _id: sessionKey,
             session_id: ad.sessionId,
@@ -83,6 +91,8 @@ exports.main = async (event = {}, context = {}) => {
             user_id: uid,
             adpid: ad.adpid,
             scene: 'coin_page_feed',
+            business_date: businessDate,
+            page,
             status: 'issued',
             created_at: timestamp,
             expires_at: timestamp + 30 * 60 * 1000

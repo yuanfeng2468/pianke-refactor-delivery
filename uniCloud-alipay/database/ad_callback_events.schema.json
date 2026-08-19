@@ -1,0 +1,20 @@
+{
+  "bsonType": "object",
+  "required": ["_id", "event_id", "trans_id", "status", "created_at"],
+  "permission": {"read": false, "create": false, "update": false, "delete": false},
+  "properties": {
+    "_id": {"bsonType": "string"},
+    "event_id": {"bsonType": "string"},
+    "trans_id": {"bsonType": "string"},
+    "order_id": {"bsonType": "string"},
+    "user_id": {"bsonType": "string"},
+    "adpid": {"bsonType": "string"},
+    "scene": {"bsonType": "string"},
+    "status": {"bsonType": "string", "enum": ["received", "verified", "duplicate", "rejected", "failed"]},
+    "request_id": {"bsonType": "string"},
+    "payload_hash": {"bsonType": "string"},
+    "created_at": {"bsonType": "long"},
+    "processed_at": {"bsonType": "long"},
+    "error_code": {"bsonType": "string"}
+  }
+}

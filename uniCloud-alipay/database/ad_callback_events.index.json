@@ -1,0 +1,16 @@
+{
+  "indexes": [
+    {
+      "IndexName": "ad_callback_events_trans_id_unique",
+      "MgoIndexKeys": [{"Name": "trans_id", "Direction": "1", "Type": "string"}],
+      "Unique": true
+    },
+    {
+      "IndexName": "ad_callback_events_order_created",
+      "MgoIndexKeys": [
+        {"Name": "order_id", "Direction": "1", "Type": "string"},
+        {"Name": "created_at", "Direction": "-1", "Type": "long"}
+      ]
+    }
+  ]
+}
