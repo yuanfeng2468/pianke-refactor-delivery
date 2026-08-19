@@ -39,7 +39,9 @@ async function processRewardedVideoCallback(params = {}) {
   const uid = String(params.user_id || params.userId || params.uid || '').trim()
   let extra = params.extra
   for (let i = 0; i < 3 && typeof extra === 'string'; i += 1) {
-    try { extra = JSON.parse(extra) } catch (_) { break }
+    const raw = extra.trim()
+    if (!raw) { extra = {}; break }
+    try { extra = JSON.parse(raw) } catch (_) { extra = { order_id: raw }; break }
   }
   extra = extra && typeof extra === 'object' && !Array.isArray(extra) ? extra : {}
   const orderId = String(extra.order_id || params.order_id || '').trim()

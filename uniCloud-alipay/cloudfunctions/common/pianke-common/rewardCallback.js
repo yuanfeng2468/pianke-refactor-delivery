@@ -12,7 +12,9 @@ function safeEqualHex(a, b) {
 function parseExtra(extra) {
   let value = extra
   for (let i = 0; i < 3 && typeof value === 'string'; i += 1) {
-    try { value = JSON.parse(value) } catch (_) { return {} }
+    const raw = value.trim()
+    if (!raw) return {}
+    try { value = JSON.parse(raw) } catch (_) { return { order_id: raw } }
   }
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {}
 }
@@ -23,14 +25,20 @@ async function handleRewardCallback(params = {}) {
   const secret = String(process.env.PIANKE_AD_CALLBACK_SECRET || '').trim()
   const expected = crypto.createHash('sha256').update(`${secret}:${transId}`, 'utf8').digest('hex')
   if (!transId || !secret || !safeEqualHex(expected, sign)) {
-    await addSecurityAuditLog({
-      event_id: `callback_rejected:${transId || Date.now()}`,
-      action: 'reward_callback_rejected',
-      severity: 'high',
-      result: 'rejected',
-      user_id: String(params.user_id || params.userId || params.uid || ''),
-      meta: { trans_id: transId, adpid: String(params.adpid || params.adp_id || '') }
-    })
+    try {
+      await addSecurityAuditLog({
+        event_id: `callback_rejected:${transId || `missing:${Date.now()}`}`,
+        action: 'reward_callback_rejected',
+        severity: 'high',
+        result: 'rejected',
+        actor_type: 'service',
+        user_id: String(params.user_id || params.userId || params.uid || ''),
+        request_id: String(params.request_id || params.requestId || ''),
+        meta: { trans_id: transId, adpid: String(params.adpid || params.adp_id || ''), reason: !transId ? 'missing_trans_id' : (!secret ? 'missing_secret' : 'invalid_signature') }
+      })
+    } catch (auditError) {
+      console.error('[reward callback] rejected audit write failed', auditError)
+    }
     return { isValid: false }
   }
 

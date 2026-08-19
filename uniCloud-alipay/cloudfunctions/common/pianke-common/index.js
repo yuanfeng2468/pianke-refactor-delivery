@@ -330,22 +330,34 @@ async function addAdLog(data) {
   const db = data.db || uniCloud.database(); const payload = { ...data }; delete payload.db
   return writeLog('ad_log', payload, db) 
 }
-async function addSecurityAuditLog(data, dbLike = null) {
+async function addSecurityAuditLog(data = {}, dbLike = null) {
   const timestamp = now()
+  const suppliedEventId = String(data.event_id || data.eventId || '').trim()
+  const requestId = String(data.request_id || data.requestId || '').trim()
+  const action = String(data.action || 'unknown').trim().slice(0, 80) || 'unknown'
+  const userId = String(data.user_id || data.uid || '').trim()
+  const eventId = (suppliedEventId || stableId('audit-event', `${action}:${requestId}:${userId}:${timestamp}`)).slice(0, 180)
   const payload = {
-    _id: data._id || stableId('audit', `${data.action}:${timestamp}`),
-    action: String(data.action || 'unknown'),
+    _id: String(data._id || stableId('audit', eventId)),
+    event_id: eventId,
+    action,
     severity: data.severity || 'info',
     result: data.result || 'success',
-    user_id: data.user_id || data.uid || '',
-    meta: data.meta || {},
+    actor_type: String(data.actor_type || 'system'),
+    actor_id: String(data.actor_id || userId || 'system'),
+    user_id: userId,
+    resource: String(data.resource || ''),
+    request_id: requestId,
+    ip_address: String(data.ip_address || ''),
+    device_id: String(data.device_id || ''),
+    meta: data.meta && typeof data.meta === 'object' ? data.meta : {},
     created_at: timestamp
   }
   const db = dbLike || uniCloud.database()
   try {
     await db.collection('security_audit_logs').doc(payload._id).set(payload)
   } catch (auditError) {
-    console.error('[pianke-common] security audit write failed', { user_id: payload.user_id, trace_id: payload.request_id || '', error_stack: String(auditError.stack || auditError.message || auditError) })
+    console.error('[pianke-common] security audit write failed', { event_id: payload.event_id, user_id: payload.user_id, trace_id: payload.request_id, error_stack: String(auditError.stack || auditError.message || auditError) })
     throw auditError
   }
   return payload._id

@@ -33,6 +33,18 @@ export function isAdEnabled(store, type) {
 let _rewardedAd = null
 let _isLoading = false
 
+function destroyRewardedInstance(adInstance) {
+  if (!adInstance) return
+  try { adInstance.offLoad && adInstance.offLoad() } catch (_) {}
+  try { adInstance.offError && adInstance.offError() } catch (_) {}
+  try { adInstance.offClose && adInstance.offClose() } catch (_) {}
+  try { adInstance.destroy && adInstance.destroy() } catch (_) {}
+}
+
+function getCurrentUserId(store) {
+  return String(store?.user?.user_id || store?.user?._id || '').trim()
+}
+
 /**
  * 预加载激励视频广告
  */
@@ -68,13 +80,18 @@ export async function playRewardedAd({ store, scene, rewardContext = {}, onRewar
     
     const orderId = orderRes.data.order_id
     
-    // 实例化广告并配置回调；没有预加载实例时必须主动 load，否则首次点击会永久等待。
-    const wasPreloaded = Boolean(_rewardedAd)
-    const adInstance = _rewardedAd || uni.createRewardedVideoAd({ adpid: String(adpid) })
-    adInstance.urlCallback = {
-      userId: String(store.user._id),
-      extra: JSON.stringify({ scene, order_id: orderId, request_id: transId })
-    }
+    // uni-ad 只会读取 createRewardedVideoAd(options) 中的 urlCallback。
+    // 不能复用未绑定订单的预加载实例，也不能在创建后给实例动态赋值，否则服务端会收到空 user_id/extra。
+    const staleAd = _rewardedAd
+    _rewardedAd = null
+    destroyRewardedInstance(staleAd)
+    const adInstance = uni.createRewardedVideoAd({
+      adpid: String(adpid),
+      urlCallback: {
+        userId: getCurrentUserId(store),
+        extra: JSON.stringify({ order_id: orderId, scene })
+      }
+    })
 
     return new Promise((resolve, reject) => {
       let settled = false
@@ -83,8 +100,8 @@ export async function playRewardedAd({ store, scene, rewardContext = {}, onRewar
         adInstance.offError()
         adInstance.offClose()
         hideLoading()
-        _rewardedAd = null
-        preloadRewardedAd(store)
+        if (_rewardedAd === adInstance) _rewardedAd = null
+        destroyRewardedInstance(adInstance)
       }
 
       const showAd = () => {
@@ -180,17 +197,13 @@ export async function playRewardedAd({ store, scene, rewardContext = {}, onRewar
         }
       })
 
-      if (wasPreloaded) {
-        if (!_isLoading) showAd()
-      } else {
-        _isLoading = true
-        adInstance.load().catch((error) => {
-          if (settled) return
-          settled = true
-          cleanup()
-          reject(error)
-        })
-      }
+      _isLoading = true
+      adInstance.load().catch((error) => {
+        if (settled) return
+        settled = true
+        cleanup()
+        reject(error)
+      })
     })
   } catch (e) {
     hideLoading()
