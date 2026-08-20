@@ -4,10 +4,9 @@ const {
   ERROR_CODES, INVITE_CONFIG, requireAuth, assertRequestedUid, findUser, getOperationConfig,
   runTransaction, addLedger, addInviteAttemptLog, addRewardGrant, checkRateLimit,
   stableId, getIdempotencyKey, safeInt, now, PiankeError, buildAssetPayload,
-  latestAssetPayload
+  latestAssetPayload,
+  RELEASE
 } = require('pianke-common')
-
-const RELEASE = 'pianke-common@3.1.0'
 
 exports.main = async (event = {}, context = {}) => {
   const inviteCode = String(event.code || event.invite_code || '').trim().toUpperCase()

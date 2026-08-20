@@ -165,34 +165,58 @@ export const useUserStore = defineStore('user', () => {
     }
   })
 
-  async function syncRelaxSeconds(seconds) {
-    if (!user.value._id || seconds <= 0 || relaxSyncPromise) return
-    const requestedSeconds = Math.min(360, Math.max(1, Math.floor(seconds)))
+  async function syncRelaxSeconds(seconds = 0) {
+    if (!user.value._id || seconds < 0) return
+    const requestedSeconds = seconds > 0 ? Math.min(360, Math.max(1, Math.floor(seconds))) : 0
     let pending = uni.getStorageSync(RELAX_SYNC_PENDING_KEY)
     if (!pending || pending.uid !== user.value._id || !pending.idempotency_key) {
+      if (requestedSeconds <= 0) return
       pending = {
         uid: user.value._id,
-        seconds: requestedSeconds,
+        seconds: 0,
         idempotency_key: generateId('relax_sync'),
         created_at: Date.now(),
         updated_at: Date.now()
       }
-    } else {
-      pending.seconds = Math.max(0, Number(pending.seconds) || 0) + requestedSeconds
-      pending.updated_at = Date.now()
     }
+    if (requestedSeconds > 0) pending.seconds = Math.max(0, Number(pending.seconds) || 0) + requestedSeconds
+    pending.updated_at = Date.now()
     uni.setStorageSync(RELAX_SYNC_PENDING_KEY, pending)
-    const syncPayload = { uid: user.value._id, increment_seconds: Math.max(1, Number(pending.seconds) || requestedSeconds), idempotency_key: pending.idempotency_key }
+
+    // 请求进行中时只累计 pending，不改变当前发送批次。
+    if (relaxSyncPromise) return relaxSyncPromise
+
+    const dispatchKey = String(pending.inflight_key || pending.idempotency_key)
+    const dispatchSeconds = Math.min(360, Math.max(1, Number(pending.inflight_seconds) || Number(pending.seconds) || 0))
+    if (dispatchSeconds <= 0) return
+    pending.inflight_key = dispatchKey
+    pending.inflight_seconds = dispatchSeconds
+    uni.setStorageSync(RELAX_SYNC_PENDING_KEY, pending)
+    const syncPayload = { uid: user.value._id, increment_seconds: dispatchSeconds, idempotency_key: dispatchKey }
     relaxSyncPromise = (async () => {
       try {
         const response = await invoke('syncRelaxStats', syncPayload)
         if (response.code === 0 && response.data) {
           applyAsset(response.data)
-          uni.removeStorageSync(RELAX_SYNC_PENDING_KEY)
+          const latest = uni.getStorageSync(RELAX_SYNC_PENDING_KEY)
+          if (latest && latest.uid === user.value._id && latest.inflight_key === dispatchKey) {
+            const syncedSeconds = Math.min(dispatchSeconds, Math.max(0, Number(response.data.synced_seconds) || dispatchSeconds))
+            const remaining = Math.max(0, Number(latest.seconds) - syncedSeconds)
+            if (remaining > 0) {
+              latest.seconds = remaining
+              latest.idempotency_key = generateId('relax_sync')
+              delete latest.inflight_key
+              delete latest.inflight_seconds
+              latest.updated_at = Date.now()
+              uni.setStorageSync(RELAX_SYNC_PENDING_KEY, latest)
+            } else {
+              uni.removeStorageSync(RELAX_SYNC_PENDING_KEY)
+            }
+          }
         }
       } catch (error) {
-        // 保留累计 pending 与幂等键，网络重试不会重复扣时。
-        console.warn('[user] relaxation sync deferred', { user_id: user.value._id, trace_id: pending.idempotency_key, error_stack: String(error?.stack || error?.message || error) })
+        // 保留不可变批次和新增 pending；重试同一批次不会重复扣时。
+        console.warn('[user] relaxation sync deferred', { user_id: user.value._id, trace_id: dispatchKey, error_stack: String(error?.stack || error?.message || error) })
       } finally {
         relaxSyncPromise = null
       }

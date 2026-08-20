@@ -26,12 +26,18 @@ exports.main = async (event = {}, context = {}) => {
   const db = uniCloud.database()
   const orderId = String(event.order_id || '').trim()
   const limit = Math.min(Math.max(Number(event.limit) || 20, 1), 100)
-  const query = { status: 'pending_review', reconciliation_status: 'pending' }
+  const recoverableStatuses = ['created', 'client_completed', 'verifying', 'verified', 'pending_review']
+  const query = { status: db.command.in(recoverableStatuses) }
   if (orderId) query.order_id = orderId
   try {
     const result = await db.collection('reward_orders').where(query).orderBy('updated_at', 'asc').limit(limit).get()
     const outcomes = []
     for (const order of result.data || []) {
+      // 没有官方 trans_id 时不能伪造回调，也不能把“等待外部证据”误报为失败。
+      if (!String(order.trans_id || '').trim()) {
+        outcomes.push({ order_id: order.order_id, status: 'awaiting_external_evidence' })
+        continue
+      }
       try {
         outcomes.push(await processRewardedVideoCallback({
           user_id: order.uid,

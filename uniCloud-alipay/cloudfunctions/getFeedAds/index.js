@@ -49,7 +49,7 @@ exports.main = async (event = {}, context = {}) => {
     
     const rawAds = adResult.data || []
     const ads = rawAds.filter(ad => ad && ad._id).map((ad, index) => {
-      const sessionId = stableId('feed_sess', `${uid}:${ad._id}:${businessDate}:${page}:${index}`)
+      let sessionId = stableId('feed_sess', `${uid}:${ad._id}:${businessDate}:${page}:${index}`)
       const width = safeInt(ad.width, 0)
       const height = safeInt(ad.height, 0)
       const ratio = ad.aspect_ratio || (width > 0 && height > 0 ? width / height : 1.7778)
@@ -72,9 +72,9 @@ exports.main = async (event = {}, context = {}) => {
 
     if (ads.length > 0) {
       // 3. 统一签发完整 session；关键写入失败不得静默降级为空列表。
-      const sessionCollection = db.collection('feed_exposure_session')
+        const sessionCollection = db.collection('feed_exposure_session')
       for (const ad of ads) {
-        const sessionKey = stableId('feed_session', ad.sessionId)
+        let sessionKey = stableId('feed_session', ad.sessionId)
         const slotId = String(ad.slotId || '').trim()
         if (!slotId) throw new Error(`广告 ${ad.id} 缺少 slot_id`)
         try {
@@ -84,6 +84,15 @@ exports.main = async (event = {}, context = {}) => {
             ad.sessionId = String(existingSession.session_id)
             continue
           }
+
+          // 终态会话不可复用或覆盖，否则客户端重试会重新获得同一 session_id，
+          // 进而把已完成的奖励流程误当成新曝光。为新曝光生成新的业务键。
+          if (existingSession && ['rewarded', 'closed', 'expired'].includes(String(existingSession.status))) {
+            sessionId = stableId('feed_sess', `${uid}:${ad._id}:${businessDate}:${page}:${index}:${timestamp}:${requestId(event, context)}:${Math.random()}`)
+            sessionKey = stableId('feed_session', sessionId)
+          }
+
+          ad.sessionId = sessionId
           await sessionCollection.doc(sessionKey).set({
             _id: sessionKey,
             session_id: ad.sessionId,

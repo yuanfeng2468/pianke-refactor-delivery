@@ -4,10 +4,8 @@ const {
   COUPON_CONFIG, ERROR_CODES, PiankeError, requireAuth, assertRequestedUid, findUser,
   checkAndResetDaily, getOperationConfig, runTransaction, addLedger, writeLog,
   checkRateLimit, safeInt, now, getBusinessDate, stableId, getIdempotencyKey, buildAssetPayload,
-  latestAssetPayload, addRelaxationLedger
+  latestAssetPayload, addRelaxationLedger, RELEASE
 } = require('pianke-common')
-
-const RELEASE = 'pianke-common@3.1.0'
 
 exports.main = async (event = {}, context = {}) => {
   const couponType = String(event.couponType || event.coupon_type || '').trim()

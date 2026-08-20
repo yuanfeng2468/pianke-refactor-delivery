@@ -37,7 +37,7 @@ must(!/meta\.late[\s\S]{0,180}奖励已到账/.test(read('pages/relax/relax.vue'
 must(/getBusinessDate/.test(createOrder) && /user_daily_stats/.test(createOrder), '创建订单使用 Asia\/Shanghai 权威每日统计')
 must(/status: 'client_completed'/.test(reportComplete), '客户端完成只推进到 client_completed，不绕过服务端验证发奖')
 must(/client_completed.*verifying.*pending_review.*rewarded/s.test(orderState), '奖励状态机包含客户端完成、核验、待复核和终态链路')
-must(/command\.in\(\['created', 'client_completed', 'verifying', 'verified', 'pending_review'\]\)/.test(queryOrder), '恢复查询覆盖全部未终结订单状态')
+must(/RECOVERABLE_STATUSES/.test(queryOrder) && /command\.in\(RECOVERABLE_STATUSES\)/.test(queryOrder) && /created', 'client_completed', 'verifying', 'verified', 'pending_review'/.test(queryOrder), '恢复查询覆盖全部未终结订单状态')
 must(/params\.transId|params\.transaction_id/.test(callbackCore), '回调核心兼容广告平台交易号字段别名')
 must(/params\.signature|params\.sig/.test(callbackCore), '回调核心兼容签名字段别名')
 must(/isValid: true/.test(callbackCore) && /isValid: false/.test(callbackCore), '回调严格返回 uni-ad 要求的 isValid 结果')

@@ -28,7 +28,7 @@ async function addRelaxationLedger({ db, uid, deltaSeconds, business_type, order
     if (String(ledger.uid) !== String(uid) || safeInt(ledger.delta_seconds) !== change) {
       throw new PiankeError('放松时长幂等键冲突', ERROR_CODES.INVALID_PARAMS)
     }
-    return ledger
+    return { ...ledger, idempotent_replay: true }
   }
 
   const user = await findUser(db, uid)
@@ -59,7 +59,7 @@ async function addRelaxationLedger({ db, uid, deltaSeconds, business_type, order
     last_relax_sync_at: timestamp
   })
   await db.collection('relaxation_ledger').doc(ledger._id).set(ledger)
-  return ledger
+  return { ...ledger, idempotent_replay: false }
 }
 
 module.exports = { addRelaxationLedger }

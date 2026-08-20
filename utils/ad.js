@@ -218,13 +218,18 @@ export async function checkAndRecoverPendingOrder({ store }) {
   if (!store?.user?._id || !isAdEnabled(store, 'rewarded')) return
   try {
     const res = await store.invoke('queryRewardOrder', { uid: store.user._id, status: 'pending_recovery' })
-    if (res?.data?.order_id && res.data.created_at && (Date.now() - res.data.created_at < 600000)) {
-      // 订单在10分钟内创建且未完成，可尝试同步状态或提示用户
-      const query = await store.invoke('queryRewardOrder', { order_id: res.data.order_id })
-      if (query?.data?.status === 'rewarded') {
-        uni.showToast({ title: '奖励已恢复', icon: 'success' })
-        await store.getUserInfo({ force: true })
-      }
+    const orders = Array.isArray(res?.data?.orders)
+      ? res.data.orders
+      : (res?.data?.order_id ? [res.data] : [])
+    let recovered = false
+    for (const order of orders) {
+      if (!order?.order_id || !order.created_at || Date.now() - order.created_at >= 600000) continue
+      const query = await store.invoke('queryRewardOrder', { order_id: order.order_id })
+      if (query?.data?.status === 'rewarded') recovered = true
+    }
+    if (recovered) {
+      uni.showToast({ title: '奖励已恢复', icon: 'success' })
+      await store.getUserInfo({ force: true })
     }
   } catch (error) {
     console.warn('[ad] pending-order recovery failed', { user_id: store.user?._id || '', trace_id: '', error_stack: String(error?.stack || error?.message || error) })

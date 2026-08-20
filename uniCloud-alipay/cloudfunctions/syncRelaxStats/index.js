@@ -33,6 +33,24 @@ exports.main = async (event = {}, context = {}) => {
       const user = await findUser(transaction, uid)
       if (!user) throw new PiankeError('用户不存在', ERROR_CODES.USER_NOT_FOUND)
 
+      const ledgerKey = `relax_consume:${idempotencyKey}`
+      const existingResult = await transaction.collection('relaxation_ledger')
+        .where({ idempotency_key: ledgerKey })
+        .limit(1)
+        .get()
+      const existingLedger = existingResult.data?.[0] || null
+      if (existingLedger) {
+        if (String(existingLedger.uid) !== String(uid) || safeInt(existingLedger.delta_seconds) !== -incrementSeconds) {
+          throw new PiankeError('放松时长幂等键冲突', ERROR_CODES.INVALID_PARAMS)
+        }
+        responsePayload = {
+          ...buildAssetPayload(user, timestamp),
+          synced_seconds: Math.abs(safeInt(existingLedger.delta_seconds)),
+          idempotent_replay: true
+        }
+        return
+      }
+
       const currentBalance = safeInt(user.relaxation_time)
 
       // 服务端余额校验：客户端只能结算已经存在的放松时长。
@@ -44,23 +62,29 @@ exports.main = async (event = {}, context = {}) => {
       if (actualDeduct <= 0) throw new PiankeError('放松时长已耗尽', ERROR_CODES.INSUFFICIENT_GOLD)
 
       // 放松时长通过不可变账本扣减；余额与账本必须在同一事务提交。
-      await addRelaxationLedger({
+      const ledger = await addRelaxationLedger({
         db: transaction,
         uid,
         deltaSeconds: -actualDeduct,
         business_type: 'relax_consume',
         order_id: `relax:${uid}:${idempotencyKey}`,
-        idempotency_key: `relax_consume:${idempotencyKey}`,
+        idempotency_key: ledgerKey,
         remark: '客户端放松时长结算'
       })
 
-      await transaction.collection('user').doc(uid).update({
-        total_relaxation_seconds: db.command.inc(actualDeduct),
-        updated_at: timestamp
-      })
+      if (!ledger.idempotent_replay) {
+        await transaction.collection('user').doc(uid).update({
+          total_relaxation_seconds: db.command.inc(actualDeduct),
+          updated_at: timestamp
+        })
+      }
 
       const updatedUser = await findUser(transaction, uid)
-      responsePayload = buildAssetPayload(updatedUser, timestamp)
+      responsePayload = {
+        ...buildAssetPayload(updatedUser, timestamp),
+        synced_seconds: actualDeduct,
+        idempotent_replay: Boolean(ledger.idempotent_replay)
+      }
     })
 
     return { code: ERROR_CODES.SUCCESS, data: responsePayload }

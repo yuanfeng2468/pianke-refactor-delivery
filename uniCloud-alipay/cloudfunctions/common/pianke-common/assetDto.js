@@ -1,9 +1,9 @@
 'use strict'
 
-const { safeInt } = require('./utils')
+const { safeInt, getBusinessDate } = require('./utils')
 
 function buildAssetDTO(user, timestamp) {
-  if (!user) return { server_timestamp: timestamp }
+  if (!user) return { server_timestamp: timestamp, server_date: getBusinessDate(timestamp) }
   const balanceGold = safeInt(user.gold_balance)
   const balanceRelaxSeconds = safeInt(user.relaxation_time)
   return {
@@ -18,7 +18,8 @@ function buildAssetDTO(user, timestamp) {
       last_ad_date: String(user.daily_ad_date || ''),
       last_feed_date: String(user.daily_feed_date || '')
     },
-    server_timestamp: timestamp
+    server_timestamp: timestamp,
+    server_date: getBusinessDate(timestamp)
   }
 }
 

@@ -15,10 +15,9 @@ const {
   addSecurityAuditLog,
   stableId,
   now,
-  buildAssetPayload
+  buildAssetPayload,
+  RELEASE
 } = require('pianke-common')
-
-const RELEASE = Object.freeze({ schema_version: '3.1.0', cloud_module_version: 'pianke-common@3.1.0' })
 
 async function auditSafely(record) {
   try {

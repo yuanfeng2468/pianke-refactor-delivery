@@ -336,7 +336,9 @@ async function claimExposure(item) {
       feedDebug('exposure:rewarded', { itemId: item.id, rewardTime: response.data.reward_time })
       userStore.emitAsset(response.data)
       await logAdEvent(userStore, { adpid: getAdpid(userStore, 'feed'), scene: 'coin_page_feed', eventType: 'exposure_rewarded', eventId: `${item.eventId}_rewarded`, transId: item.sessionId, meta: { reward_time: response.data.reward_time } })
-      uni.showToast({ title: `停留达标，已获得 ${response.data.reward_gold} 金币与 1 分钟时长`, icon: 'success' })
+      const rewardSeconds = Math.max(0, Number(response.data.reward_time) || 0)
+      const rewardDuration = rewardSeconds > 0 && rewardSeconds % 60 === 0 ? `${rewardSeconds / 60} 分钟` : `${rewardSeconds} 秒`
+      uni.showToast({ title: `停留达标，已获得 ${response.data.reward_gold} 金币与 ${rewardDuration}时长`, icon: 'success' })
       activeExposure.value = null
       void startNextExposure()
     }

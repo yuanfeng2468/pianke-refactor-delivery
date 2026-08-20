@@ -90,8 +90,12 @@ async function processRewardedVideoCallback(params = {}) {
       return
     }
 
-    if (order.status !== 'verifying') assertTransition('reward_orders', order.status, 'verifying')
-    await transaction.collection('reward_orders').doc(order._id).update({ status: 'verifying', trans_id: transId, callback_time: timestamp, updated_at: timestamp })
+    if (order.status === 'verified') {
+      // verified 表示上游已完成核验；回调/对账只需进入统一发奖段，不能再回退到 verifying。
+    } else {
+      if (order.status !== 'verifying') assertTransition('reward_orders', order.status, 'verifying')
+      await transaction.collection('reward_orders').doc(order._id).update({ status: 'verifying', trans_id: transId, callback_time: timestamp, updated_at: timestamp })
+    }
 
     const rewardGold = Math.max(0, safeInt(order.reward_gold))
     const rewardTime = Math.max(0, safeInt(order.reward_time))
