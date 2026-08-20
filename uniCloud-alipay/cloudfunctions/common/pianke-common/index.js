@@ -7,7 +7,7 @@ const orderState = require('./orderState')
 const walletService = require('./walletService')
 const relaxationService = require('./relaxationService')
 const { addRelaxationLedger } = relaxationService
-const { incrementDailyStat } = require('./dailyStats')
+const { getDailyStat, incrementDailyStat } = require('./dailyStats')
 const { processRewardedVideoCallback } = require('./rewardedVideoService')
 const { grantInviteReward } = require('./invite')
 const { buildAssetDTO } = require('./assetDto')
@@ -382,7 +382,7 @@ module.exports = {
   getIdempotencyKey, assertRequestedUid, requestId, requestToken, safeAdminSecretCompare,
   clientDeviceId, clientIp, createUserInTransaction, createUserSession, requireAuth,
   getClientInfo, runTransaction, getOperationConfig, getRequiredOperationConfig, getOperationNumber,
-  getOperationString, getBatchConfigs, checkAndResetDaily, ensureUserInTransaction, checkRateLimit, evaluateInterstitialFrequency,
+  getOperationString, getBatchConfigs, checkAndResetDaily, ensureUserInTransaction, checkRateLimit, evaluateInterstitialFrequency, getDailyStat, incrementDailyStat,
   relaxationGrantPatch, writeLog, addGoldLog, addInviteAttemptLog, addRewardGrant, addAdLog,
   addSecurityAuditLog, buildAssetPayload, latestAssetPayload, ok, fail, assert
 }

@@ -10,7 +10,7 @@ function readJson(file) {
 
 const pkg = readJson('package.json')
 const manifest = readJson('manifest.json')
-if (pkg.version !== '3.1.1' || manifest.versionName !== '3.1.1' || Number(manifest.versionCode) !== 311) throw new Error('APK version metadata is not unified at 3.1.1/311')
+if (pkg.version !== '3.1.2' || manifest.versionName !== '3.1.2' || Number(manifest.versionCode) !== 312) throw new Error('APK version metadata is not unified at 3.1.2/312')
 
 const adminConfig = fs.readFileSync(path.join(root, 'uniCloud-alipay/cloudfunctions/adminOperationConfig/index.js'), 'utf8')
 if (!adminConfig.includes('const transactionResult = await runTransaction')) throw new Error('admin config transaction result contract failed')
@@ -37,6 +37,6 @@ if (app.indexOf('const privacyAgreed = await ensurePrivacyConsent()') > app.inde
 if (/setTimeout\([^\n]*checkPrivacyPolicy/.test(app) || /checkPrivacyPolicy\(\)/.test(app)) throw new Error('legacy delayed privacy prompt remains')
 
 const query = fs.readFileSync(path.join(root, 'uniCloud-alipay/cloudfunctions/queryRewardOrder/index.js'), 'utf8')
-if (!query.includes("query.status = 'created'") || !query.includes('10 * 60 * 1000') || !query.includes('created_at: order.created_at')) throw new Error('pending recovery contract failed')
+if (!query.includes("['created', 'client_completed', 'verifying', 'verified', 'pending_review']") || !query.includes('10 * 60 * 1000') || !query.includes('created_at: order.created_at')) throw new Error('pending recovery contract failed')
 
-console.log(JSON.stringify({ schemas_checked: schemas.length, asset_whitelist: true, privacy_gate: true, pending_recovery: true, apk_version: '3.1.1/311', admin_config_transaction: true }))
+console.log(JSON.stringify({ schemas_checked: schemas.length, asset_whitelist: true, privacy_gate: true, pending_recovery: true, apk_version: '3.1.2/312', admin_config_transaction: true }))

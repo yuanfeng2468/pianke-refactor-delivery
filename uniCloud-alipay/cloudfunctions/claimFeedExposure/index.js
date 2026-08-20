@@ -3,9 +3,9 @@ const {
   requireAuth, assertRequestedUid, ERROR_CODES, PiankeError,
   getOperationConfig, getRequiredOperationConfig, getOperationNumber, findUser,
   checkAndResetDaily, getTodayString, runTransaction, stableId, getIdempotencyKey,
-  safeInt, now, buildAssetPayload, addLedger, addRelaxationLedger, resolveScenePolicy, addRewardGrant
+  safeInt, now, buildAssetPayload, addLedger, addRelaxationLedger, resolveScenePolicy,
+  addRewardGrant, getDailyStat, incrementDailyStat
 } = require('pianke-common')
-const { getDailyStat, incrementDailyStat } = require('../common/pianke-common/dailyStats')
 
 exports.main = async (event = {}, context = {}) => {
   const requestedUid = String(event.uid || '').trim()
