@@ -1,7 +1,7 @@
 'use strict'
 const { 
   requireAuth, assertRequestedUid, ERROR_CODES, getBatchConfigs,
-  getOperationString, stableId, now, getBusinessDate, checkRateLimit, AD_CONFIG, safeInt, addAdLog, requestId, AD_EVENTS
+  getOperationString, stableId, now, getBusinessDate, checkRateLimit, AD_CONFIG, safeInt, addAdLog, requestId, AD_EVENTS, runTransaction
 } = require('pianke-common')
 
 function positiveInt(value, fallback, max) {
@@ -72,40 +72,44 @@ exports.main = async (event = {}, context = {}) => {
 
     if (ads.length > 0) {
       // 3. 统一签发完整 session；关键写入失败不得静默降级为空列表。
-        const sessionCollection = db.collection('feed_exposure_session')
       for (const ad of ads) {
-        let sessionKey = stableId('feed_session', ad.sessionId)
+        let sessionId = String(ad.sessionId || '').trim()
+        let sessionKey = stableId('feed_session', sessionId)
         const slotId = String(ad.slotId || '').trim()
         if (!slotId) throw new Error(`广告 ${ad.id} 缺少 slot_id`)
         try {
-          const existingResult = await sessionCollection.doc(sessionKey).get()
-          const existingSession = existingResult.data?.[0] || existingResult.data
-          if (existingSession && safeInt(existingSession.expires_at) > timestamp && ['issued', 'active'].includes(String(existingSession.status))) {
-            ad.sessionId = String(existingSession.session_id)
-            continue
-          }
+          await runTransaction(async (transaction) => {
+            const sessionCollection = transaction.collection('feed_exposure_session')
+            const existingResult = await sessionCollection.doc(sessionKey).get()
+            const existingSession = existingResult.data?.[0] || existingResult.data
+            const existingStatus = String(existingSession?.status || '')
+            const existingUsable = existingSession && safeInt(existingSession.expires_at) > timestamp && ['issued', 'active'].includes(existingStatus)
+            if (existingUsable) {
+              ad.sessionId = String(existingSession.session_id)
+              return
+            }
 
-          // 终态会话不可复用或覆盖，否则客户端重试会重新获得同一 session_id，
-          // 进而把已完成的奖励流程误当成新曝光。为新曝光生成新的业务键。
-          if (existingSession && ['rewarded', 'closed', 'expired'].includes(String(existingSession.status))) {
-            sessionId = stableId('feed_sess', `${uid}:${ad._id}:${businessDate}:${page}:${index}:${timestamp}:${requestId(event, context)}:${Math.random()}`)
-            sessionKey = stableId('feed_session', sessionId)
-          }
+            // 终态或已过期的 issued/active 会话均不可覆盖或复活；为新曝光生成新业务键。
+            if (existingSession) {
+              sessionId = stableId('feed_sess', `${uid}:${ad.id}:${businessDate}:${page}:${ad.sessionId}:${timestamp}:${requestId(event, context)}:${Math.random()}`)
+              sessionKey = stableId('feed_session', sessionId)
+            }
 
-          ad.sessionId = sessionId
-          await sessionCollection.doc(sessionKey).set({
-            _id: sessionKey,
-            session_id: ad.sessionId,
-            slot_id: slotId,
-            user_id: uid,
-            adpid: ad.adpid,
-            scene: 'coin_page_feed',
-            business_date: businessDate,
-            page,
-            status: 'issued',
-            created_at: timestamp,
-            expires_at: timestamp + 30 * 60 * 1000
-          })
+            ad.sessionId = sessionId
+            await sessionCollection.doc(sessionKey).set({
+              _id: sessionKey,
+              session_id: ad.sessionId,
+              slot_id: slotId,
+              user_id: uid,
+              adpid: ad.adpid,
+              scene: 'coin_page_feed',
+              business_date: businessDate,
+              page,
+              status: 'issued',
+              created_at: timestamp,
+              expires_at: timestamp + 30 * 60 * 1000
+            })
+          }, { retries: 2 })
         } catch (writeError) {
           await addAdLog({
             user_id: uid,
@@ -113,7 +117,7 @@ exports.main = async (event = {}, context = {}) => {
             event_type: AD_EVENTS.LOAD_FAILED,
             scene: 'coin_page_feed',
             placement_id: ad.adpid,
-            status: 'error',
+            status: 'failed',
             detail: { session_id: ad.sessionId, error_stack: String(writeError.stack || writeError.message || writeError) }
           })
           throw writeError

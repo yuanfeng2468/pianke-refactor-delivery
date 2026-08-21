@@ -13,7 +13,7 @@ exports.main = async (event = {}, context = {}) => {
   const content = String(event.content || '').trim()
   const contact = String(event.contact || '').trim().slice(0, 160)
 
-  if (!requestedUid && !event.auth_token || !content) {
+  if (!content) {
     return { code: ERROR_CODES.INVALID_PARAMS, message: '反馈内容不能为空' }
   }
 

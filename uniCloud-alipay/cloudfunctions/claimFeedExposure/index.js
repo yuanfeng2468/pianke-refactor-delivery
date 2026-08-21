@@ -45,15 +45,15 @@ exports.main = async (event = {}, context = {}) => {
         if (!session.session_id || !session.slot_id || !session.expires_at) {
           throw new PiankeError('会话字段不完整', ERROR_CODES.SYSTEM_ERROR)
         }
-        if (safeInt(session.expires_at) < timestamp) {
-          throw new PiankeError('广告会话已过期', ERROR_CODES.RESOURCE_NOT_FOUND)
-        }
         if (String(session.status) !== 'issued') {
           if (['active', 'rewarded', 'closed', 'expired'].includes(String(session.status))) {
             responsePayload = { session_id: sessionId, status: session.status, started_at: session.started_at }
             return
           }
           throw new PiankeError('广告会话状态无效', ERROR_CODES.INVALID_PARAMS)
+        }
+        if (safeInt(session.expires_at) < timestamp) {
+          throw new PiankeError('广告会话已过期', ERROR_CODES.RESOURCE_NOT_FOUND)
         }
         await transaction.collection('feed_exposure_session').doc(sessionKey).update({
           status: 'active', started_at: timestamp, updated_at: timestamp
@@ -67,9 +67,7 @@ exports.main = async (event = {}, context = {}) => {
       if (String(session.adpid || '') !== adpid || String(session.scene || '') !== scene) {
         throw new PiankeError('广告会话不匹配', ERROR_CODES.INVALID_PARAMS)
       }
-      if (safeInt(session.expires_at, timestamp + 1) < timestamp) {
-        throw new PiankeError('广告会话已过期', ERROR_CODES.RESOURCE_NOT_FOUND)
-      }
+      const sessionStatus = String(session.status)
 
       // 奖励授予是 claim 的幂等事实。即使客户端在事务提交后丢失响应，
       // 重试也只能返回既有奖励，不能再次消耗每日计数。
@@ -101,23 +99,24 @@ exports.main = async (event = {}, context = {}) => {
         }
       }
 
-      if (!['active'].includes(String(session.status))) {
-        if (['rewarded', 'closed'].includes(String(session.status))) {
-          const existingUser = await findUser(transaction, uid)
-          responsePayload = String(session.status) === 'rewarded'
-            ? {
-                session_id: sessionId,
-                status: 'rewarded',
-                reward_gold: safeInt(session.reward_gold),
-                reward_time: safeInt(session.reward_time),
-                idempotent_replay: true,
-                ...buildAssetPayload(existingUser, timestamp)
-              }
-            : { session_id: sessionId, status: session.status }
-          return
-        }
-        throw new PiankeError('广告会话状态无效', ERROR_CODES.INVALID_PARAMS)
+      if (['rewarded', 'closed', 'expired'].includes(sessionStatus)) {
+        const existingUser = await findUser(transaction, uid)
+        responsePayload = sessionStatus === 'rewarded'
+          ? {
+              session_id: sessionId,
+              status: 'rewarded',
+              reward_gold: safeInt(session.reward_gold),
+              reward_time: safeInt(session.reward_time),
+              idempotent_replay: true,
+              ...buildAssetPayload(existingUser, timestamp)
+            }
+          : { session_id: sessionId, status: sessionStatus }
+        return
       }
+      if (safeInt(session.expires_at, timestamp + 1) < timestamp) {
+        throw new PiankeError('广告会话已过期', ERROR_CODES.RESOURCE_NOT_FOUND)
+      }
+      if (sessionStatus !== 'active') throw new PiankeError('广告会话状态无效', ERROR_CODES.INVALID_PARAMS)
       const exposureMs = timestamp - safeInt(session.started_at, timestamp)
       if (action === 'close' || (action === 'claim' && exposureMs < minMs)) {
         if (action === 'close') {

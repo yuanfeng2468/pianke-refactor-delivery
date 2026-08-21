@@ -1,5 +1,15 @@
 [
   {
+    "IndexName": "exchange_trans_id_unique",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "trans_id", "Direction": "1", "Type": "varchar" }
+      ],
+      "MgoIsUnique": true
+    },
+    "MgoIsSparse": false
+  },
+  {
     "IndexName": "exchange_user_created_at",
     "MgoKeySchema": {
       "MgoIndexKeys": [

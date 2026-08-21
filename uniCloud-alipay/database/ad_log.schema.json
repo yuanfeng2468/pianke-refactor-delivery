@@ -9,7 +9,7 @@
     "adpid": { "description": "广告位 ID", "bsonType": "string" },
     "scene": { "description": "广告业务场景", "bsonType": "string", "enum": ["relax", "coin_page_quick_earn", "coin_page_feed", "interstitial_popup", "interstitial_exit_coin", "interstitial_before_background"] },
     "event_type": { "description": "标准广告事件", "bsonType": "string", "enum": ["request", "fill", "start", "show", "click", "complete", "close", "error", "middle_exit", "reward_success", "reward_fail", "reward_duplicate", "exposure_start", "exposure_rewarded", "exposure_expired", "skipped", "reward", "load_start", "load_success", "load_failed", "show_requested", "shown", "closed", "callback_received", "callback_verified", "reward_granted"] },
-    "status": { "description": "事件处理状态", "bsonType": "string", "enum": ["success", "failed", "timeout", "skipped"] },
+    "status": { "description": "事件处理状态", "bsonType": "string", "enum": ["success", "failed", "timeout", "skipped", "pending"] },
     "trans_id": { "description": "关联业务事务 ID", "bsonType": "string" },
     "reward_amount": { "description": "本事件关联金币数，实际资产以奖励凭证为准", "bsonType": "int", "minimum": 0 },
     "reward_time": { "description": "本事件关联放松秒数", "bsonType": "int", "minimum": 0 },

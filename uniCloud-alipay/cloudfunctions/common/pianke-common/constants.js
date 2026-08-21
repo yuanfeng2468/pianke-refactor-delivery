@@ -1,8 +1,8 @@
 'use strict'
 
 const RELEASE = Object.freeze({
-  schema_version: '3.1.3',
-  cloud_module_version: 'pianke-common@3.1.3',
+  schema_version: '3.1.4',
+  cloud_module_version: 'pianke-common@3.1.4',
   service_space_id: 'env-00jy6ozy1390'
 })
 

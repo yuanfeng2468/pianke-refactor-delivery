@@ -1,6 +1,6 @@
 {
   "bsonType": "object",
-  "required": ["_id", "user_id", "exchange_type", "gold_consumed", "time_added", "created_at"],
+  "required": ["_id", "trans_id", "user_id", "exchange_type", "gold_consumed", "time_added", "created_at"],
   "permission": {
     "read": false,
     "create": false,
@@ -11,6 +11,12 @@
     "_id": {
       "description": "记录ID",
       "bsonType": "string"
+    },
+    "trans_id": {
+      "description": "兑换业务幂等键",
+      "bsonType": "string",
+      "minLength": 8,
+      "maxLength": 160
     },
     "user_id": {
       "description": "用户ID",

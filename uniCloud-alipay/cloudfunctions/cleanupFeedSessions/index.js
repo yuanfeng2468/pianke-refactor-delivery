@@ -2,6 +2,11 @@
 const { ERROR_CODES, now, runTransaction, addAdLog, AD_EVENTS } = require('pianke-common')
 
 exports.main = async (event = {}, context = {}) => {
+  const request_id = String(context.requestId || event.request_id || '')
+  const triggerType = String(context.triggerType || context.trigger_type || '').toLowerCase()
+  if (triggerType !== 'timer') {
+    return { code: ERROR_CODES.ADMIN_UNAUTHORIZED, message: '仅允许定时任务调用', data: { request_id } }
+  }
   try {
     const db = uniCloud.database()
     const timestamp = now()

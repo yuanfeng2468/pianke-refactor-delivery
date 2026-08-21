@@ -4,7 +4,7 @@ const {
   COUPON_CONFIG, ERROR_CODES, PiankeError, requireAuth, assertRequestedUid, findUser,
   checkAndResetDaily, getOperationConfig, runTransaction, addLedger, writeLog,
   checkRateLimit, safeInt, now, getBusinessDate, stableId, getIdempotencyKey, buildAssetPayload,
-  latestAssetPayload, addRelaxationLedger, RELEASE
+  addRelaxationLedger, RELEASE
 } = require('pianke-common')
 
 exports.main = async (event = {}, context = {}) => {
@@ -22,12 +22,7 @@ exports.main = async (event = {}, context = {}) => {
     // 1. 频率限制
     await checkRateLimit(`exchange:${uid}`, 5, 60)
 
-    // 2. 幂等性检查
-    const db = uniCloud.database()
-    const existing = await db.collection('exchange_record').where({ trans_id: transId, user_id: uid }).limit(1).get()
-    if (existing.data?.length) return { code: ERROR_CODES.SUCCESS, message: '兑换已处理', data: await latestAssetPayload(uid) }
-
-    // 3. 配置读取 (对齐 constants.js)
+    // 2. 配置读取 (对齐 constants.js)
     const configured = await getOperationConfig(`coupon_${couponType}`, {})
     const cost = Math.max(0, safeInt(configured?.cost || configured?.gold_cost, coupon.gold_cost))
     const time = Math.max(0, safeInt(configured?.time || configured?.relax_seconds, coupon.relax_seconds))
@@ -40,12 +35,22 @@ exports.main = async (event = {}, context = {}) => {
     const dailyStatsId = stableId('daily_stats', `${uid}:${businessDate}`)
 
     const result = await runTransaction(async (transaction) => {
+      // 幂等检查必须位于同一事务内，避免并发请求在事务外同时读到“未处理”。
+      const existingResult = await transaction.collection('exchange_record')
+        .where({ trans_id: transId, user_id: uid }).limit(1).get()
+      const existing = existingResult.data?.[0] || existingResult.data
+      if (existing) {
+        if (String(existing.exchange_type || '') !== couponType) {
+          throw new PiankeError('兑换幂等键与兑换类型不匹配', ERROR_CODES.INVALID_PARAMS)
+        }
+        return { user: await findUser(transaction, uid), replayed: true }
+      }
+
       const user = await findUser(transaction, uid)
       if (!user) throw new PiankeError('用户不存在', ERROR_CODES.USER_NOT_FOUND)
       if (user.activation_status !== 'activated') throw new PiankeError('账户尚未激活', ERROR_CODES.INVITE_CODE_NOT_ACTIVATED)
       
       const reset = checkAndResetDaily(user, timestamp)
-      const current = { ...user, ...reset.patch }
       const statsCollection = transaction.collection('user_daily_stats')
       const statsResult = await statsCollection.doc(dailyStatsId).get()
       const stats = statsResult.data?.[0] || statsResult.data || null
@@ -93,10 +98,14 @@ exports.main = async (event = {}, context = {}) => {
         created_at: timestamp 
       }, transaction)
       
-      return await findUser(transaction, uid)
+      return { user: await findUser(transaction, uid), replayed: false }
     }, { retries: 2 })
 
-    return { code: ERROR_CODES.SUCCESS, message: `成功兑换${couponName}`, data: buildAssetPayload(result, timestamp) }
+    return {
+      code: ERROR_CODES.SUCCESS,
+      message: result.replayed ? '兑换已处理' : `成功兑换${couponName}`,
+      data: buildAssetPayload(result.user, timestamp)
+    }
   } catch (error) {
     console.error('[exchangeCoupon] failed', { uid, transId, code: error.code, message: error.message })
     return { code: Number(error.code) || ERROR_CODES.SYSTEM_ERROR, message: error.message || '兑换失败' }
