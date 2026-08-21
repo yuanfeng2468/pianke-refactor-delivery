@@ -6,6 +6,7 @@
 |---|---|---|
 | user | initUser、getUserInfo、activateWithInviteCode | auth、asset、session |
 | asset | exchangeCoupon、syncRelaxStats、getWalletLedger、getGoldLogs | asset、transaction、idempotency |
+| quota | getDailyQuota | auth、config、server-time、snapshot |
 | ad/rewarded | createRewardOrder、uni-ad-callback、reportAdCompleted、queryRewardOrder、cancelRewardOrder、addAdReward | auth、idempotency、transaction、logger |
 | ad/feed | getFeedAds、claimFeedExposure、cleanupFeedSessions | session、logger、validator |
 | ad/interstitial | checkInterstitialAdFrequency | transaction、idempotency、logger |
@@ -17,7 +18,7 @@
 
 ## 共享模块
 
-`architecture.js` 是新代码的域边界兼容门面；`api.js` 统一成功、失败和断言语义；`assetDto.js` 负责最小化资产响应；`invite.js` 负责自动邀请与手动补领的同一事务内核。现有 `index.js` 保留为兼容入口，后续新增云函数不得继续扩展其中的业务逻辑。
+`architecture.js` 是新代码的域边界兼容门面；`api.js` 统一成功、失败和断言语义；`assetDto.js` 负责最小化资产响应；`invite.js` 负责自动邀请与手动补领的同一事务内核；`quotaService.js` 负责每日配额类型、稳定键和快照镜像。现有 `index.js` 保留为兼容入口，后续新增云函数不得继续扩展其中的业务逻辑。
 
 ## 返回契约
 

@@ -1,0 +1,51 @@
+{
+  "bsonType": "object",
+  "required": ["_id", "user_id", "quota_date", "quota_type", "used_count", "limit_count", "updated_at"],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "description": "用户+日期+配额类型的稳定主键",
+      "bsonType": "string"
+    },
+    "user_id": {
+      "description": "用户ID",
+      "bsonType": "string"
+    },
+    "quota_date": {
+      "description": "服务端自然日，格式YYYY-MM-DD",
+      "bsonType": "string"
+    },
+    "quota_type": {
+      "description": "配额类型",
+      "bsonType": "string",
+      "enum": ["rewarded_video", "feed_reward", "coupon_15min", "coupon_60min", "interstitial"]
+    },
+    "used_count": {
+      "description": "当日已使用次数",
+      "bsonType": "int",
+      "minimum": 0
+    },
+    "limit_count": {
+      "description": "当日上限，-1表示无限",
+      "bsonType": "int",
+      "minimum": -1
+    },
+    "source": {
+      "description": "计数来源：user_mirror或transaction",
+      "bsonType": "string"
+    },
+    "created_at": {
+      "description": "创建时间戳（毫秒）",
+      "bsonType": "long"
+    },
+    "updated_at": {
+      "description": "更新时间戳（毫秒）",
+      "bsonType": "long"
+    }
+  }
+}

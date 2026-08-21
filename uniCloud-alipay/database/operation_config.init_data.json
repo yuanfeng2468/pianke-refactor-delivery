@@ -158,5 +158,69 @@
     "description": "隐私政策云端前端托管地址",
     "updated_by": "system_init",
     "updated_at": 0
+  },
+  {
+    "_id": "config_videocount",
+    "config_key": "videocount",
+    "config_value": { "value": 15 },
+    "description": "激励视频每日上限",
+    "updated_by": "system_init",
+    "updated_at": 0
+  },
+  {
+    "_id": "config_setadtime_time",
+    "config_key": "setadtime.time",
+    "config_value": { "value": 20 },
+    "description": "激励视频最小间隔秒数",
+    "updated_by": "system_init",
+    "updated_at": 0
+  },
+  {
+    "_id": "config_reward_coin_default",
+    "config_key": "reward_coin_default",
+    "config_value": { "value": 50 },
+    "description": "激励视频默认金币奖励",
+    "updated_by": "system_init",
+    "updated_at": 0
+  },
+  {
+    "_id": "config_reward_time_default",
+    "config_key": "reward_time_default",
+    "config_value": { "value": 300 },
+    "description": "激励视频默认放松秒数奖励",
+    "updated_by": "system_init",
+    "updated_at": 0
+  },
+  {
+    "_id": "config_feed_reward_gold",
+    "config_key": "feed_reward_gold",
+    "config_value": { "value": 10 },
+    "description": "信息流达标金币奖励",
+    "updated_by": "system_init",
+    "updated_at": 0
+  },
+  {
+    "_id": "config_coupon_15min_limit",
+    "config_key": "coupon_15min_limit",
+    "config_value": { "value": 3 },
+    "description": "15分钟兑换每日上限",
+    "updated_by": "system_init",
+    "updated_at": 0
+  },
+  {
+    "_id": "config_coupon_60min_limit",
+    "config_key": "coupon_60min_limit",
+    "config_value": { "value": 1 },
+    "description": "60分钟兑换每日上限",
+    "updated_by": "system_init",
+    "updated_at": 0
+  },
+  {
+    "_id": "config_checkin_rewards",
+    "config_key": "checkin_rewards",
+    "config_value": { "value": [20, 25, 30, 35, 40, 50, 80] },
+    "description": "连续签到七日循环奖励金币",
+    "updated_by": "system_init",
+    "updated_at": 0
   }
 ]

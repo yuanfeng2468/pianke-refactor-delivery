@@ -1,0 +1,26 @@
+[
+  {
+    "IndexName": "user_date_type_unique",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "user_id", "Direction": "1", "Type": "varchar" },
+        { "Name": "quota_date", "Direction": "1", "Type": "varchar" },
+        { "Name": "quota_type", "Direction": "1", "Type": "varchar" }
+      ],
+      "MgoIsUnique": true
+    },
+    "MgoIsSparse": false
+  },
+  {
+    "IndexName": "date_type_updated_at",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "quota_date", "Direction": "-1", "Type": "varchar" },
+        { "Name": "quota_type", "Direction": "1", "Type": "varchar" },
+        { "Name": "updated_at", "Direction": "-1", "Type": "long" }
+      ],
+      "MgoIsUnique": false
+    },
+    "MgoIsSparse": false
+  }
+]

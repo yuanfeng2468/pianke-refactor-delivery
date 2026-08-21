@@ -10,6 +10,7 @@ const { processRewardedVideoCallback } = require('./rewardedVideoService')
 const { grantInviteReward } = require('./invite')
 const { buildAssetDTO } = require('./assetDto')
 const { ok, fail, assert } = require('./api')
+const quotaService = require('./quotaService')
 
 const {
   RELEASE, ERROR_CODES, AD_CONFIG, INVITE_CONFIG, CHECKIN_CONFIG, COUPON_CONFIG,
@@ -362,5 +363,6 @@ module.exports = {
   getClientInfo, runTransaction, getOperationConfig, getOperationNumber,
   getOperationString, getBatchConfigs, checkAndResetDaily, ensureUserInTransaction, checkRateLimit, evaluateInterstitialFrequency,
   relaxationGrantPatch, writeLog, addGoldLog, addInviteAttemptLog, addRewardGrant, addAdLog,
-  addSecurityAuditLog, buildAssetPayload, latestAssetPayload, ok, fail, assert
+  addSecurityAuditLog, buildAssetPayload, latestAssetPayload, ok, fail, assert,
+  ...quotaService
 }
