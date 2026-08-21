@@ -81,6 +81,14 @@
       "description": "是否已发放邀请双方奖励",
       "bsonType": "bool"
     },
+    "account_status": {
+      "description": "账户可用状态，与激活状态正交",
+      "bsonType": "string",
+      "enum": [
+        "active",
+        "disabled"
+      ]
+    },
     "activation_status": {
       "description": "账户激活状态",
       "bsonType": "string",

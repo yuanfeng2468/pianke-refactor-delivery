@@ -16,8 +16,8 @@
         </view>
         <view class="asset-divider" />
         <view class="asset-item" @click="syncAssets">
-          <text class="asset-label">今日进度</text>
-          <text class="asset-value">{{ user.daily_ad_count || 0 }}/{{ userStore.dailyAdLimit }}</text>
+          <text class="asset-label">今日激励</text>
+          <text class="asset-value">{{ rewardedQuota.used_count }}/{{ rewardedQuota.limit_count }}</text>
         </view>
       </view>
       <view class="progress-track"><view class="progress-fill" :style="{ width: `${userStore.adProgress}%` }" /></view>
@@ -27,6 +27,10 @@
           <template v-else-if="rewardLoading">广告准备中...</template>
           <template v-else>快速赚金币 · 完整观看获取金币与放松时间奖励</template>
         </text>
+      </view>
+      <view class="quota-strip">
+        <view class="quota-chip"><text>激励视频</text><text>{{ rewardedQuota.used_count }}/{{ rewardedQuota.limit_count }}</text></view>
+        <view class="quota-chip"><text>信息流</text><text>{{ feedQuota.used_count }}/{{ feedQuota.limit_count }}</text></view>
       </view>
     </view>
 
@@ -53,7 +57,7 @@
           class="day-item"
           :class="{ 'day-active': day <= (userStore.user.continuous_checkin || 0), 'day-today': day === ((userStore.user.continuous_checkin || 0) % 7) + 1 && !userStore.isTodayCheckedIn }"
         >
-          <text class="day-gold">+{{ [10, 20, 30, 50, 80, 100, 200][day-1] }}</text>
+          <text class="day-gold">+{{ checkinRewards[day - 1] || 0 }}</text>
           <view class="day-dot" />
           <text class="day-label">{{ day }}天</text>
         </view>
@@ -124,6 +128,9 @@ const isPageActive = ref(false)
 const activeExposure = ref(null)
 const currentPage = ref(0)
 const hasMore = ref(true)
+const rewardedQuota = computed(() => userStore.dailyQuota.rewarded_video || { used_count: Number(user.value.daily_ad_count || 0), limit_count: userStore.dailyAdLimit })
+const feedQuota = computed(() => userStore.dailyQuota.feed_reward || { used_count: Number(user.value.daily_feed_count || 0), limit_count: userStore.dailyFeedLimit })
+const checkinRewards = computed(() => Array.isArray(userStore.config.checkin_rewards) ? userStore.config.checkin_rewards : [20, 25, 30, 35, 40, 50, 80])
 const requiredExposureSeconds = computed(() => Math.max(60, Math.ceil(Number(userStore.config.feed_exposure_min_ms || 60000) / 1000)))
 let exposureTimer = null
 let autoLoadTimer = null
@@ -638,7 +645,7 @@ async function showInterstitialAd() {
 .asset-label { color:rgba(255,255,255,.56); font-size:22rpx; }
 .asset-value { color:#b8e8ff; font-size:34rpx; font-weight:700; }
 .asset-value.gold { color:#e6c66d; }
-.progress-track { height:8rpx; overflow:hidden; border-radius:99rpx; background:rgba(255,255,255,.12); }
+.quota-strip{display:flex;gap:14rpx;margin-top:18rpx}.quota-chip{display:flex;justify-content:space-between;flex:1;padding:12rpx 16rpx;border-radius:14rpx;background:rgba(255,255,255,.05);color:rgba(255,255,255,.58);font-size:20rpx}.quota-chip text:last-child{color:#e6c66d;font-variant-numeric:tabular-nums}.progress-track{ height:8rpx; overflow:hidden; border-radius:99rpx; background:rgba(255,255,255,.12); }
 .progress-fill { height:100%; border-radius:99rpx; background:linear-gradient(90deg,#d9b450,#f4dc8a); transition:width .3s; }
 .quick-earn-btn { margin-top:24rpx; padding:23rpx 20rpx; border-radius:999rpx; text-align:center; background:linear-gradient(135deg,#d9b450,#e6c66d); box-shadow:0 8rpx 24rpx rgba(217,180,80,.28); }
 .quick-earn-btn.disabled { opacity:.5; }

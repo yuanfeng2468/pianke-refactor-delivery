@@ -1,7 +1,7 @@
 'use strict'
 const { 
   requireAuth, assertRequestedUid, ERROR_CODES, getBatchConfigs,
-  getOperationString, stableId, now, AD_CONFIG, safeInt, addAdLog, requestId, AD_EVENTS
+  getOperationString, stableId, now, AD_CONFIG, safeInt, addAdLog, requestId, AD_EVENTS, assertAccountActive
 } = require('pianke-common')
 
 function positiveInt(value, fallback, max) {
@@ -27,6 +27,7 @@ exports.main = async (event = {}, context = {}) => {
     ])
 
     const uid = assertRequestedUid(requestedUid, auth.uid)
+    assertAccountActive(auth.user)
     const feedEnabled = configs.ad_enabled_feed !== false && configs.ad_enabled_feed !== 'false'
     const configuredAdpid = getOperationString(configs.adpid_feed, AD_CONFIG.FEED_AD.ADPID).trim()
     

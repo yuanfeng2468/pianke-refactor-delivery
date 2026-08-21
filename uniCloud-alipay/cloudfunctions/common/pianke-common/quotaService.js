@@ -67,9 +67,20 @@ async function readOrMirrorQuota({ db, user, quotaType, quotaDate, config = {}, 
   const id = quotaDocumentId(user._id, quotaDate, quotaType)
   const result = await database.collection('daily_quota').doc(id).get()
   const record = result.data?.[0] || result.data || null
-  if (record) return buildQuotaSnapshot({ user, quotaType, quotaDate, config, record })
   const snapshot = buildQuotaSnapshot({ user, quotaType, quotaDate, config })
   const timestamp = now()
+  if (record) {
+    const needsSync = safeInt(record.used_count) !== snapshot.used_count || safeInt(record.limit_count, snapshot.limit_count) !== snapshot.limit_count
+    if (needsSync) {
+      await database.collection('daily_quota').doc(id).update({
+        used_count: snapshot.used_count,
+        limit_count: snapshot.limit_count,
+        source: 'user_mirror',
+        updated_at: timestamp
+      })
+    }
+    return snapshot
+  }
   await database.collection('daily_quota').doc(id).set({
     _id: id,
     user_id: user._id,

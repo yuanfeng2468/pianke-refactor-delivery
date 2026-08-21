@@ -79,6 +79,7 @@ function defaultUserDocument(uid, deviceId, timestamp = now()) {
     invite_code: `PK${hash(uid).slice(0, 8).toUpperCase()}`,
     invited_by: '',
     invite_reward_claimed: false,
+    account_status: 'active',
     activation_status: 'pending',
     continuous_checkin: 0,
     last_checkin_date: '',
@@ -113,6 +114,13 @@ async function createUserSession(uid, deviceId) {
   }
   await uniCloud.database().collection('user_sessions').doc(session._id).set(session)
   return { ...session, token }
+}
+
+function assertAccountActive(user) {
+  if (user && String(user.account_status || 'active') === 'disabled') {
+    throw new PiankeError('账户已被限制使用', ERROR_CODES.RISK_BLOCKED)
+  }
+  return user
 }
 
 async function requireAuth(event = {}, context = {}) {
@@ -359,7 +367,7 @@ module.exports = {
   addLedger, addRelaxationLedger, processRewardedVideoCallback, grantInviteReward, transitions, assertTransition, canTransition,
   SCENE_POLICIES, getScenePolicy, normalizeRewardContext, assertScene,
   getIdempotencyKey, assertRequestedUid, requestId, requestToken, safeAdminSecretCompare,
-  clientDeviceId, clientIp, createUserInTransaction, createUserSession, requireAuth,
+  clientDeviceId, clientIp, createUserInTransaction, createUserSession, requireAuth, assertAccountActive,
   getClientInfo, runTransaction, getOperationConfig, getOperationNumber,
   getOperationString, getBatchConfigs, checkAndResetDaily, ensureUserInTransaction, checkRateLimit, evaluateInterstitialFrequency,
   relaxationGrantPatch, writeLog, addGoldLog, addInviteAttemptLog, addRewardGrant, addAdLog,

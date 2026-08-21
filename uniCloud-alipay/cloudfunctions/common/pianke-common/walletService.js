@@ -30,6 +30,7 @@ async function addLedger({ db, uid, delta, business_type, order_id = '', idempot
 
     const user = await findUser(db, uid)
     if (!user) throw new PiankeError('用户不存在', ERROR_CODES.USER_NOT_FOUND)
+    if (String(user.account_status || 'active') === 'disabled') throw new PiankeError('账户已被限制使用', ERROR_CODES.RISK_BLOCKED)
     
     const before_balance = safeInt(user.gold_balance)
     const after_balance = before_balance + change

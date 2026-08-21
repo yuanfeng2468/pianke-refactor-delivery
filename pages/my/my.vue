@@ -56,8 +56,8 @@
         </view>
         <view class="panel">
           <text class="section-label">今日激励进度</text>
-          <view class="progress-row"><text class="progress-label">激励视频</text><view class="progress-bar"><view class="progress-fill" :style="{ width: `${userStore.adProgress}%` }" /></view><text class="progress-text">{{ user.daily_ad_count || 0 }}/{{ userStore.dailyAdLimit }}</text></view>
-          <view class="progress-row"><text class="progress-label">信息流曝光</text><view class="progress-bar"><view class="progress-fill feed-progress" :style="{ width: `${userStore.feedProgress}%` }" /></view><text class="progress-text">{{ user.daily_feed_count || 0 }}/{{ userStore.dailyFeedLimit }}</text></view>
+          <view class="progress-row"><text class="progress-label">激励视频</text><view class="progress-bar"><view class="progress-fill" :style="{ width: `${quotaProgress('rewarded_video')}%` }" /></view><text class="progress-text">{{ quotaValue('rewarded_video') }}</text></view>
+          <view class="progress-row"><text class="progress-label">信息流曝光</text><view class="progress-bar"><view class="progress-fill feed-progress" :style="{ width: `${quotaProgress('feed_reward')}%` }" /></view><text class="progress-text">{{ quotaValue('feed_reward') }}</text></view>
           <text class="panel-desc">当前奖励规则由运营配置控制，资产以云端返回为准。</text>
         </view>
         <view class="panel">
@@ -79,11 +79,11 @@
         <text class="section-label section-title">免广告加时兑换</text>
         <view class="coupon-card panel">
           <view><text class="coupon-title">{{ coupon15Minutes }} 分钟加时</text><text class="coupon-subtitle">服务端原子扣减金币并增加放松时长</text></view>
-          <view class="coupon-side"><text class="coupon-price">{{ config.coupon_15min_cost }} 金币</text><text class="coupon-limit">今日 {{ user.coupon_15min_today || 0 }}/{{ config.coupon_15min_daily_limit }}</text><view class="exchange-btn" :class="{ disabled: !canExchange15min }" @click="confirmExchange('15min')">{{ exchangeLabel('15min') }}</view></view>
+          <view class="coupon-side"><text class="coupon-price">{{ config.coupon_15min_cost }} 金币</text><text class="coupon-limit">今日 {{ quotaValue('coupon_15min') }}</text><view class="exchange-btn" :class="{ disabled: !canExchange15min }" @click="confirmExchange('15min')">{{ exchangeLabel('15min') }}</view></view>
         </view>
         <view class="coupon-card panel">
           <view><text class="coupon-title">{{ coupon60Minutes }} 分钟畅享</text><text class="coupon-subtitle">并发请求只允许一次成功扣款</text></view>
-          <view class="coupon-side"><text class="coupon-price">{{ config.coupon_60min_cost }} 金币</text><text class="coupon-limit">今日 {{ user.coupon_60min_today || 0 }}/{{ config.coupon_60min_daily_limit }}</text><view class="exchange-btn" :class="{ disabled: !canExchange60min }" @click="confirmExchange('60min')">{{ exchangeLabel('60min') }}</view></view>
+          <view class="coupon-side"><text class="coupon-price">{{ config.coupon_60min_cost }} 金币</text><text class="coupon-limit">今日 {{ quotaValue('coupon_60min') }}</text><view class="exchange-btn" :class="{ disabled: !canExchange60min }" @click="confirmExchange('60min')">{{ exchangeLabel('60min') }}</view></view>
         </view>
       </view>
 
@@ -134,6 +134,30 @@ const achievements = computed(() => ({
   persistenceKing: (user.value.continuous_checkin || 0) >= 7,
   generous: (user.value.total_ad_views || 0) >= 50
 }))
+function quotaSnapshot(type, fallbackUsed, fallbackLimit) {
+  return userStore.dailyQuota[type] || { used_count: Number(fallbackUsed || 0), limit_count: Number(fallbackLimit || 0) }
+}
+
+function quotaValue(type) {
+  const fallback = {
+    rewarded_video: [user.value.daily_ad_count, userStore.dailyAdLimit],
+    feed_reward: [user.value.daily_feed_count, userStore.dailyFeedLimit],
+    coupon_15min: [user.value.coupon_15min_today, config.value.coupon_15min_daily_limit],
+    coupon_60min: [user.value.coupon_60min_today, config.value.coupon_60min_daily_limit]
+  }[type] || [0, 0]
+  const quota = quotaSnapshot(type, fallback[0], fallback[1])
+  return `${quota.used_count}/${quota.limit_count}`
+}
+
+function quotaProgress(type) {
+  const fallback = {
+    rewarded_video: [user.value.daily_ad_count, userStore.dailyAdLimit],
+    feed_reward: [user.value.daily_feed_count, userStore.dailyFeedLimit]
+  }[type] || [0, 0]
+  const quota = quotaSnapshot(type, fallback[0], fallback[1])
+  return quota.limit_count > 0 ? Math.min(100, Math.round((quota.used_count / quota.limit_count) * 100)) : 0
+}
+
 let logPage = 1
 
 onShow(() => {

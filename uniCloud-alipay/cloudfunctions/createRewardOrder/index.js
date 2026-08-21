@@ -5,7 +5,7 @@ const {
   checkAndResetDaily, getClientInfo, getIdempotencyKey, 
   getBatchConfigs, getOperationNumber, getOperationString, 
   now, requireAuth, runTransaction, safeInt, stableId, 
-  assertScene, normalizeRewardContext, addSecurityAuditLog 
+  assertScene, normalizeRewardContext, addSecurityAuditLog, assertAccountActive
 } = require('pianke-common')
 
 exports.main = async (event = {}, context = {}) => {
@@ -28,6 +28,7 @@ exports.main = async (event = {}, context = {}) => {
     ])
     
     authUid = auth.uid
+    assertAccountActive(auth.user)
     const scene = String(event.scene || '').trim()
     const scenePolicy = assertScene(scene)
     const reward_context = normalizeRewardContext(event.reward_context || {})

@@ -19,6 +19,7 @@ async function addRelaxationLedger({ db, uid, deltaSeconds, business_type, order
   if (change === 0) {
     const user = await findUser(db, uid)
     if (!user) throw new PiankeError('用户不存在', ERROR_CODES.USER_NOT_FOUND)
+    if (String(user.account_status || 'active') === 'disabled') throw new PiankeError('账户已被限制使用', ERROR_CODES.RISK_BLOCKED)
     return { _id: stableId('relax_ledger', key), uid, before_seconds: safeInt(user.relaxation_time), delta_seconds: 0, after_seconds: safeInt(user.relaxation_time), business_type, order_id: String(order_id || ''), idempotency_key: key }
   }
 
@@ -33,6 +34,7 @@ async function addRelaxationLedger({ db, uid, deltaSeconds, business_type, order
 
   const user = await findUser(db, uid)
   if (!user) throw new PiankeError('用户不存在', ERROR_CODES.USER_NOT_FOUND)
+  if (String(user.account_status || 'active') === 'disabled') throw new PiankeError('账户已被限制使用', ERROR_CODES.RISK_BLOCKED)
 
   const before = safeInt(user.relaxation_time)
   const after = before + change

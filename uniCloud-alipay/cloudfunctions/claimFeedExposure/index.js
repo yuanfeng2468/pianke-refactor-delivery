@@ -3,7 +3,7 @@ const {
   requireAuth, assertRequestedUid, ERROR_CODES, PiankeError, 
   getOperationConfig, getOperationNumber, findUser, 
   checkAndResetDaily, runTransaction, stableId, getIdempotencyKey, 
-  safeInt, now, buildAssetPayload, addLedger, addRelaxationLedger, getScenePolicy, addRewardGrant
+  safeInt, now, buildAssetPayload, addLedger, addRelaxationLedger, getScenePolicy, addRewardGrant, assertAccountActive
 } = require('pianke-common')
 
 exports.main = async (event = {}, context = {}) => {
@@ -21,6 +21,7 @@ exports.main = async (event = {}, context = {}) => {
   try {
     const auth = await requireAuth(event, context)
     const uid = assertRequestedUid(requestedUid, auth.uid)
+    assertAccountActive(auth.user)
     
     const scenePolicy = getScenePolicy(scene) || { fixed_gold: 10, fixed_time: 60 }
     const minMs = Math.max(1000, getOperationNumber(await getOperationConfig('feed_exposure_min_ms', 60000), 60000))
