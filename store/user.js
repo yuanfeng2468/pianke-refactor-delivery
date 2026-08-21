@@ -7,11 +7,13 @@ const AUTH_TOKEN_KEY = 'pianke_auth_token'
 const INSTALLATION_KEY = 'pianke_installation_id'
 const RELAX_SYNC_PENDING_KEY = 'pianke_relax_sync_pending'
 const DEFAULT_CONFIG = {
-  daily_ad_limit: 100,
-  daily_feed_limit: 100,
-  rewarded_video_gold: 100,
+  daily_ad_limit: 15,
+  daily_feed_limit: 20,
+  rewarded_video_gold: 50,
   rewarded_video_time: 300,
+  feed_reward_gold: 10,
   feed_exposure_min_ms: 60000,
+  checkin_rewards: [20, 25, 30, 35, 40, 50, 80],
   feed_exposure_reward_time: 60,
   coupon_15min_cost: 300,
   coupon_15min_time: 900,
@@ -54,6 +56,7 @@ export const useUserStore = defineStore('user', () => {
   })
   const goldLogs = ref([])
   const goldLogsTotal = ref(0)
+  const dailyQuota = ref({})
   const config = ref({ ...DEFAULT_CONFIG })
   const serverTimestamp = ref(0)
   const serverDate = ref('')
@@ -100,6 +103,16 @@ export const useUserStore = defineStore('user', () => {
 
   function getAuthToken() {
     return uni.getStorageSync(AUTH_TOKEN_KEY) || ''
+  }
+
+  function applyDailyQuota(data = {}) {
+    const quotas = Array.isArray(data.quotas) ? data.quotas : []
+    dailyQuota.value = Object.fromEntries(quotas.map(item => [item.quota_type, { ...item }]))
+    if (data.server_timestamp) {
+      serverTimestamp.value = Number(data.server_timestamp)
+      clockOffset.value = serverTimestamp.value - Date.now()
+    }
+    if (data.server_date) serverDate.value = String(data.server_date)
   }
 
   function applyAsset(data = {}) {
@@ -266,6 +279,13 @@ export const useUserStore = defineStore('user', () => {
           config.value = { ...config.value, ...(configRes.value.data || {}) }
           lastConfigFetchAt = Date.now()
         }
+
+        try {
+          const quotaRes = await invoke('getDailyQuota', { uid: user.value._id })
+          applyDailyQuota(quotaRes.data || {})
+        } catch (quotaError) {
+          console.warn('[user] daily quota sync deferred', { user_id: user.value._id || '', trace_id: '', error_stack: String(quotaError?.stack || quotaError?.message || quotaError) })
+        }
         
         initialized.value = true
         return { success: true, data: userRes.value.data }
@@ -283,20 +303,12 @@ export const useUserStore = defineStore('user', () => {
   async function checkIn() {
     if (isTodayCheckedIn.value) return { success: false, message: '今日已签到' }
     
-    // 乐观 UI 更新
-    const backup = { ...user.value }
-    const today = serverDate.value || new Date().toISOString().split('T')[0]
-    user.value.last_checkin_date = today
-    user.value.gold_balance += (config.value.checkin_reward_gold || 100)
-    user.value.continuous_checkin += 1
-
     try {
       const res = await invoke('checkIn')
       applyAsset(res.data)
       void fetchGoldLogs({ page_num: 1 })
       return { success: true, message: res.message }
     } catch (err) {
-      user.value = backup // 回滚
       return { success: false, message: err.message }
     }
   }
@@ -308,21 +320,12 @@ export const useUserStore = defineStore('user', () => {
     
     if (user.value.gold_balance < coupon.cost) return { success: false, message: '金币不足' }
     
-    // 乐观 UI 更新
-    const backup = { ...user.value }
-    const backupTarget = targetTime.value
-    user.value.gold_balance -= coupon.cost
-    user.value[coupon.field] += 1
-    targetTime.value += coupon.time * 1000
-
     try {
       const res = await invoke('exchangeCoupon', { couponType, idempotency_key: generateId('ex') })
       applyAsset(res.data)
       void fetchGoldLogs({ page_num: 1 })
       return { success: true, message: res.message }
     } catch (err) {
-      user.value = backup
-      targetTime.value = backupTarget
       return { success: false, message: err.message }
     }
   }
@@ -338,12 +341,12 @@ export const useUserStore = defineStore('user', () => {
   }
 
   return {
-    user, goldLogs, goldLogsTotal, config, targetTime, serverTimestamp, serverDate,
+    user, goldLogs, goldLogsTotal, dailyQuota, config, targetTime, serverTimestamp, serverDate,
     remainingSeconds, isActive, formattedRelaxTime, dailyAdLimit, adProgress,
     dailyFeedLimit, feedProgress, canExchange15min, canExchange60min, isLoading,
     error, initialized, getOrCreateUid, syncUser, initUser: () => { startClock(); return syncUser('initUser') },
     getUserInfo: (opts) => { startClock(); return syncUser('getUserInfo', opts) },
-    invoke, ensureSessionReady, formatDateTime, fetchGoldLogs, exchangeCoupon, checkIn, isTodayCheckedIn, applyAsset,
+    invoke, ensureSessionReady, formatDateTime, fetchGoldLogs, exchangeCoupon, checkIn, isTodayCheckedIn, applyAsset, applyDailyQuota,
     emitAsset: (d) => { applyAsset(d); void fetchGoldLogs(); uni.$emit('asset_updated', d) }
   }
 })

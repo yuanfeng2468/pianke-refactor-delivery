@@ -2,23 +2,23 @@
   {
     "_id": "config_daily_ad_limit",
     "config_key": "daily_ad_limit",
-    "config_value": { "value": 100 },
-    "description": "每日激励视频奖励上限",
+    "config_value": { "value": 15 },
+    "description": "每日激励视频上限",
     "updated_by": "system_init",
     "updated_at": 0
   },
   {
     "_id": "config_daily_feed_limit",
     "config_key": "daily_feed_limit",
-    "config_value": { "value": 100 },
-    "description": "每日信息流曝光奖励上限",
+    "config_value": { "value": 20 },
+    "description": "每日信息流奖励上限",
     "updated_by": "system_init",
     "updated_at": 0
   },
   {
     "_id": "config_rewarded_video_reward",
     "config_key": "rewarded_video_reward",
-    "config_value": { "gold": 100, "time": 300 },
+    "config_value": { "gold": 50, "time": 300 },
     "description": "激励视频奖励金币和放松秒数",
     "updated_by": "system_init",
     "updated_at": 0
@@ -42,8 +42,8 @@
   {
     "_id": "config_interstitial_frequency_minutes",
     "config_key": "interstitial_frequency_minutes",
-    "config_value": { "value": 3 },
-    "description": "插屏最小展示间隔分钟",
+    "config_value": { "value": 2 },
+    "description": "插屏广告最小展示间隔（分钟）",
     "updated_by": "system_init",
     "updated_at": 0
   },
